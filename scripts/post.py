@@ -1,6 +1,6 @@
 """Posts a run's findings to its PR as one GitHub review by Reptile, with a summary of what was checked.
-Author role: every finding inline (low confidence ones marked), summary block in the PR description. Reviewer role: only P0-P2 with
-confidence >= 0.75 inline, summary block in the review body. Writes <out>/posted.json."""
+Author role: every finding inline (low confidence ones marked), summary block in the PR description. Reviewer role (someone else's PR): only P0-P2 with
+confidence >= 0.75 inline, nothing else posted. Writes <out>/posted.json."""
 import json, os, re, subprocess, sys
 import llm
 
@@ -160,10 +160,10 @@ def run(args):
     counts = ", ".join(f"{s}: {n}" for s in ("P0", "P1", "P2", "P3") if (n := sum(f["sev"] == s for f in inline)))
     body = f"Reptile: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
     review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments,
-              "body": body if role == "author" else f"{body}\n\n{block}"}
+              "body": body}
     if args.dry_run:
         print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}\n\n# description block" +
-              (f"\n{block}" if role == "author" else ": none (reviewer role, the block is in the review body)"))
+              (f"\n{block}" if role == "author" else ": none (reviewer role: only high-confidence comments are posted)"))
         return
     publish(args, role, review, inline, pr, block, done)
 
