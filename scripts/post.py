@@ -1,7 +1,9 @@
 """Posts a run's findings to its PR as one GitHub review by Reptile, with a summary of what was checked.
-Author role: every finding inline (low confidence ones marked), summary block in the PR description. Reviewer role (someone else's PR): only P0-P2 with
+Author role: findings with confidence >= 0.5 inline, the rest as one list in the review summary, notes block in the
+PR description. Reviewer role (someone else's PR): only P0-P2 with
 confidence >= 0.75 inline, nothing else posted. Writes <out>/posted.json."""
 import json, os, re, subprocess, sys
+from urllib.parse import quote
 import llm
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,7 +45,7 @@ def parse_findings(text):
 
 def is_inline(f, role):
     if role == "author":
-        return True
+        return f["confidence"] >= LOW
     return f["sev"] in ("P0", "P1", "P2") and f["confidence"] >= 0.75
 
 
@@ -91,10 +93,7 @@ def written_comments(findings, out):
 
 def review_comment(f, written, spot):
     start, end, moved = spot
-    title, _, rest = written["body"].partition("\n")
-    if f["confidence"] < LOW:
-        title += f"\n\n<sub>Low confidence ({f['confidence']:.2f}): check that the scenario is reachable before fixing.</sub>"
-    body = f"{title}\n{rest}".rstrip()
+    body = written["body"].rstrip()
     if written.get("suggestion") and not moved:
         body += f"\n\n```suggestion\n{written['suggestion'].rstrip()}\n```"
     body += fix_prompt(f, written["body"])
@@ -111,17 +110,28 @@ def fix_prompt(f, text):
             "`````\n</details>")
 
 
+def low_confidence_list(findings, nwo, sha):
+    """One summary list instead of a thread each: most findings under LOW turn out wrong or not worth changing."""
+    if not findings:
+        return ""
+    rows = [f"- **{f['sev']}** [`{f['path'].rsplit('/', 1)[-1]}:{f['start']}`]"
+            f"(https://github.com/{nwo}/blob/{sha}/{quote(f['path'])}#L{f['start']}-L{f['end']}) "
+            f"{f['problem']} Fix: {f['fix']} ({f['id']}, confidence {f['confidence']:.2f})" for f in findings]
+    return "\n".join(["", "", f"**Low confidence ({len(findings)})**: check that each is reachable before changing anything.", "", *rows])
+
+
 def passed_rows(out):
     path = f"{out}/passed.md"
     return [[x.strip() for x in l.split(" | ")] for l in open(path).read().splitlines() if l.strip()] if os.path.exists(path) else []
 
 
-def summary_block(posted, held, passed):
+def summary_block(posted, low, held, passed):
     unsure = [f"- {f['sev']} `{f['path']}:{f['start']}-{f['end']}` {f['problem']} Fix: {f['fix']} (confidence {f['confidence']})"
               for f in held]
     unsure = [f"- {r[1]}. Manual step: {r[2] if len(r) > 2 else 'unknown'}" for r in passed if r[0] == "NOT CONFIRMED"] + unsure
     safe = [f"- {r[1]}" + (f" ({r[2]})" if len(r) > 2 else "") for r in passed if r[0] == "SAFE"]
-    return "\n".join([START, f"**Code review done by Reptile**: {posted} issues posted as comments · {len(safe)} checked and safe"
+    return "\n".join([START, f"**Code review done by Reptile**: {posted} issues posted as comments"
+                      + (f" · {low} low confidence in the review summary" if low else "") + f" · {len(safe)} checked and safe"
                       f" · {len(unsure)} unsure", "", f"<details><summary>Reptile review notes ({len(safe)} + {len(unsure)})</summary>",
                       "", "**Unsure**", "", *(unsure or ["- none"]), "", "**Checked and safe**", "", *(safe or ["- none"]), "",
                       "</details>", END])
@@ -153,24 +163,26 @@ def run(args):
     findings = parse_findings(open(f"{args.out}/findings.md").read())
     spots = {f["id"]: place(f, files) for f in findings}
     inline = [f for f in findings if is_inline(f, role) and spots[f["id"]] and f["id"] not in done]
-    held = [f for f in findings if f not in inline and f["id"] not in done]
+    low = [f for f in findings if role == "author" and spots[f["id"]] and f["confidence"] < LOW and f["id"] not in done]
+    held = [f for f in findings if f not in inline and f not in low and f["id"] not in done]
     written = written_comments(inline, args.out)
     comments = [review_comment(f, written[f["id"]], spots[f["id"]]) for f in inline]
-    block = summary_block(len(comments) + len(done), held, passed_rows(args.out))
+    block = summary_block(len(comments) + len(done), len(low), held, passed_rows(args.out))
     counts = ", ".join(f"{s}: {n}" for s in ("P0", "P1", "P2", "P3") if (n := sum(f["sev"] == s for f in inline)))
     body = f"Reptile: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
+    body += low_confidence_list(low, args.nwo, pr["headRefOid"])
     review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments,
               "body": body}
     if args.dry_run:
         print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}\n\n# description block" +
               (f"\n{block}" if role == "author" else ": none (reviewer role: only high-confidence comments are posted)"))
         return
-    publish(args, role, review, inline, pr, block, done)
+    publish(args, role, review, inline, pr, block, done, low)
 
 
-def publish(args, role, review, inline, pr, block, done):
-    posted = {"pr": args.pr, "role": role, "comments": dict(done)}
-    if review["comments"] or role == "reviewer":
+def publish(args, role, review, inline, pr, block, done, low):
+    posted = {"pr": args.pr, "role": role, "comments": dict(done), "grouped": [f["id"] for f in low]}
+    if review["comments"] or low or role == "reviewer":
         res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
                             stdin=json.dumps(review)))
         made = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews/{res['id']}/comments?per_page=100"))

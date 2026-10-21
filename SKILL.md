@@ -39,7 +39,7 @@ A rerun on the same head commit reuses the answers already in the run directory.
 ```
 
 - `--role auto` is `author` when the gh user opened the PR, else `reviewer`.
-- Author: every finding becomes an inline comment (below 0.5 confidence it is marked "Low confidence"), and the PR description gets a Reptile block with the SAFE and unsure items.
+- Author: findings with confidence >= 0.5 become inline comments; the rest are one "Low confidence" list in the review summary (in benchmarks most of them were declined), and the PR description gets a Reptile block with the SAFE and unsure items.
 - Reviewer (someone else's PR): only P0-P2 with confidence >= 0.75 inline. Nothing else is posted: no description edit, no notes block; the rest stays in the run directory.
 - All comments go out as one review. `<run dir>/posted.json` maps each finding id (`F3`) to its comment id. A second post of the same run is refused unless `--force`.
 
