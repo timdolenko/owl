@@ -35,7 +35,8 @@ def threads(nwo, pr):
 
 
 def said(c):
-    body = re.sub(r"<details>.*?</details>|<img[^>]*>|<a href=\"#\">\s*</a>", "", c.get("body") or "", flags=re.S).strip()
+    body = re.sub(r"<details>.*?</details>|<img[^>]*>", "", c.get("body") or "", flags=re.S)
+    body = re.sub(r"<a href=\"[^\"]*\">\s*(?:<[^>]*>\s*)*</a>|<a href=\"https://app\.greptile[^\"]*\">.*?</a>", "", body, flags=re.S).strip()
     return f"**{(c.get('author') or c.get('user') or {}).get('login', '?')}**: {body[:CAP]}"
 
 
