@@ -114,6 +114,8 @@ def cmd_review(args):
         if not os.path.exists(os.path.join(MODES, f"{m}.md")):
             sys.exit(f"unknown mode {m}: modes are {', '.join(f[:-3] for f in sorted(os.listdir(MODES)) if f != 'common.md')}")
     context = resolve_range(args)
+    if args.context_file:
+        context += "\n## Ticket context from the author (not public)\n\n" + open(args.context_file).read()
     ignore_runs(args.repo)
     args.out = os.path.abspath(args.out or os.path.join(args.repo, ".reptile", args.sha))
     os.makedirs(args.out, exist_ok=True)
@@ -196,6 +198,7 @@ def parser():
     r.add_argument("--base", help="base ref (default: merge-base with origin's default branch, or the PR's base)")
     r.add_argument("--head", help="head ref (default: HEAD, or the PR's head commit)")
     r.add_argument("--pr", type=int, help="GitHub PR number: title, body and base come from `gh pr view`")
+    r.add_argument("--context", dest="context_file", help="extra context file (ticket, acceptance criteria), added to the PR description")
     r.add_argument("--out", help="run directory (default: <repo>/.reptile/<head-sha>)")
     r.add_argument("--modes", default="clean-code,regressions", help="single-mode reviewers, comma separated ('' for none)")
     for flag, text in (("--no-wiki", "skip the per-area wiki pages"), ("--no-memory", "skip team rules from past reviews"),
