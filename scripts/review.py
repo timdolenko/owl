@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Greptile-style review of one PR: graph context packs + wiki + team memory -> one reviewer per file group ->
 one whole-PR pass + single-mode reviewers -> dedupe (or filter). Writes <out>/findings.md (F-lines) and
-<out>/findings.raw.md (every candidate). run(args) takes the namespace deep_review.py builds."""
+<out>/findings.raw.md (every candidate). run(args) takes the namespace reptile.py builds."""
 import json, os, re, subprocess, time
 from concurrent.futures import ThreadPoolExecutor
 import graph, llm, pack, wiki
@@ -42,8 +42,8 @@ def findings_lines(text, base=""):
 
 
 def notes(args, name):
-    """The repo's own reviewer notes: $DEEP_REVIEW_NOTES/<name>.md, else <repo>/.deep-review/notes/<name>.md."""
-    path = os.path.join(os.environ.get("DEEP_REVIEW_NOTES") or os.path.join(args.repo, ".deep-review", "notes"), f"{name}.md")
+    """The repo's own reviewer notes: $REPTILE_NOTES/<name>.md, else <repo>/.reptile/notes/<name>.md."""
+    path = os.path.join(os.environ.get("REPTILE_NOTES") or os.path.join(args.repo, ".reptile", "notes"), f"{name}.md")
     return open(path).read() if os.path.exists(path) else ""
 
 

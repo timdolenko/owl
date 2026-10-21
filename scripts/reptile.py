@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""deep-pr-review (Reptile): Greptile-style review of a PR or branch with Claude Code or Codex CLI.
+"""reptile (Reptile): Greptile-style review of a PR or branch with Claude Code or Codex CLI.
 
-  deep_review.py [review] [--pr N | --base REF --head REF]   review a diff, write findings.md
-  deep_review.py index [--sha REF]                            repo graph + wiki for a commit
-  deep_review.py memory [--since YYYY-MM-DD]                  past PR review threads -> team rules
-  deep_review.py refresh                                      index the default branch + memory of the last 2 days
-  deep_review.py post --out RUN --pr N [--role auto]          post findings as one GitHub review by Reptile
-  deep_review.py reply --pr N --comment ID --status fixed     answer (and resolve) one posted comment
+  reptile.py [review] [--pr N | --base REF --head REF]   review a diff, write findings.md
+  reptile.py index [--sha REF]                            repo graph + wiki for a commit
+  reptile.py memory [--since YYYY-MM-DD]                  past PR review threads -> team rules
+  reptile.py refresh                                      index the default branch + memory of the last 2 days
+  reptile.py post --out RUN --pr N [--role auto]          post findings as one GitHub review by Reptile
+  reptile.py reply --pr N --comment ID --status fixed     answer (and resolve) one posted comment
 
-Data (graph, wiki, memory): ${DEEP_REVIEW_HOME:-~/.cache/deep-pr-review}/<owner-repo>/.
-Engine: --engine or DEEP_REVIEW_ENGINE (claude | codex)."""
+Data (graph, wiki, memory): ${REPTILE_HOME:-~/.cache/reptile}/<owner-repo>/.
+Engine: --engine or REPTILE_ENGINE (claude | codex)."""
 import argparse, datetime, json, os, re, shutil, subprocess, sys
 
-HOME = os.path.expanduser(os.environ.get("DEEP_REVIEW_HOME", "~/.cache/deep-pr-review"))
+HOME = os.path.expanduser(os.environ.get("REPTILE_HOME", "~/.cache/reptile"))
 VENV = os.path.join(HOME, "venv")
 MODES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "modes")
 COMMANDS = ("review", "index", "memory", "refresh", "post", "reply")
@@ -101,7 +101,7 @@ def worktree(args):
 
 def ignore_runs(repo):
     """Keeps run output out of commits; notes/ stays committable."""
-    path = os.path.join(repo, ".deep-review", ".gitignore")
+    path = os.path.join(repo, ".reptile", ".gitignore")
     if not os.path.exists(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         open(path, "w").write("/*\n!/notes/\n")
@@ -115,7 +115,7 @@ def cmd_review(args):
             sys.exit(f"unknown mode {m}: modes are {', '.join(f[:-3] for f in sorted(os.listdir(MODES)) if f != 'common.md')}")
     context = resolve_range(args)
     ignore_runs(args.repo)
-    args.out = os.path.abspath(args.out or os.path.join(args.repo, ".deep-review", args.sha))
+    args.out = os.path.abspath(args.out or os.path.join(args.repo, ".reptile", args.sha))
     os.makedirs(args.out, exist_ok=True)
     args.context = os.path.join(args.out, "context.md")
     open(args.context, "w").write(context)
@@ -183,16 +183,16 @@ def days_ago(n):
 def parser():
     base = argparse.ArgumentParser(add_help=False)
     base.add_argument("--repo", help="git repository (default: the one containing the current directory)")
-    base.add_argument("--engine", choices=("claude", "codex"), default=os.environ.get("DEEP_REVIEW_ENGINE", "claude"))
+    base.add_argument("--engine", choices=("claude", "codex"), default=os.environ.get("REPTILE_ENGINE", "claude"))
     common = argparse.ArgumentParser(add_help=False, parents=[base])
     common.add_argument("--dry-run", action="store_true", help="build everything and write every prompt, call no model")
-    p = argparse.ArgumentParser(prog="deep_review.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(prog="reptile.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", metavar="{review,index,memory,refresh,post,reply}")
     r = sub.add_parser("review", parents=[common], help="review a PR or branch diff (default)")
     r.add_argument("--base", help="base ref (default: merge-base with origin's default branch, or the PR's base)")
     r.add_argument("--head", help="head ref (default: HEAD, or the PR's head commit)")
     r.add_argument("--pr", type=int, help="GitHub PR number: title, body and base come from `gh pr view`")
-    r.add_argument("--out", help="run directory (default: <repo>/.deep-review/<head-sha>)")
+    r.add_argument("--out", help="run directory (default: <repo>/.reptile/<head-sha>)")
     r.add_argument("--modes", default="clean-code,regressions", help="single-mode reviewers, comma separated ('' for none)")
     for flag, text in (("--no-wiki", "skip the per-area wiki pages"), ("--no-memory", "skip team rules from past reviews"),
                        ("--no-packs", "skip the graph context packs"), ("--no-dedupe", "keep every raw candidate"),

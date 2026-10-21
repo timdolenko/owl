@@ -5,17 +5,17 @@ import json, os, re, shlex, subprocess, tempfile, time
 LIMIT = re.compile(r"rate.?limit|\b429\b|quota|overloaded|usage limit|temporarily limiting|Proxy not running|ECONNREFUSED|socket hang up", re.I)
 API_ERROR = re.compile(r"^\s*API Error\b", re.I)
 MAX_WAIT = 4 * 3600
-CALL_TIMEOUT = int(os.environ.get("DEEP_REVIEW_CALL_TIMEOUT", 3600))
+CALL_TIMEOUT = int(os.environ.get("REPTILE_CALL_TIMEOUT", 3600))
 DRY = "(dry run: no model was called)\nNONE\nNO_FINDINGS"
 
 
 class CallFailed(RuntimeError):
     pass
 
-ENGINE = os.environ.get("DEEP_REVIEW_ENGINE", "claude")
-MODEL = os.environ.get("DEEP_REVIEW_MODEL", "claude-opus-5-5")
-CHEAP = os.environ.get("DEEP_REVIEW_CHEAP_MODEL", "claude-haiku-5-5")
-MEMORY = os.environ.get("DEEP_REVIEW_MEMORY_MODEL", "claude-sonnet-5-5")
+ENGINE = os.environ.get("REPTILE_ENGINE", "claude")
+MODEL = os.environ.get("REPTILE_MODEL", "claude-opus-5-5")
+CHEAP = os.environ.get("REPTILE_CHEAP_MODEL", "claude-haiku-5-5")
+MEMORY = os.environ.get("REPTILE_MEMORY_MODEL", "claude-sonnet-5-5")
 DRY_RUN = False
 
 
@@ -49,8 +49,8 @@ def ask(prompt, base, model=None, cwd=None, tools=False, max_turns=None):
 
 
 def claude_call(prompt, base, model, cwd, tools, max_turns):
-    """`claude -p` with read-only tools; DEEP_REVIEW_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
-    args = shlex.split(os.environ.get("DEEP_REVIEW_CLAUDE_CMD", "claude"))
+    """`claude -p` with read-only tools; REPTILE_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
+    args = shlex.split(os.environ.get("REPTILE_CLAUDE_CMD", "claude"))
     args += ["-p", prompt, "--model", model, "--output-format", "json", "--dangerously-skip-permissions"]
     args += ["--disallowedTools", "Edit", "Write", "NotebookEdit", "Agent", "WebFetch", "WebSearch"] if tools else ["--tools", ""]
     if max_turns:
@@ -70,12 +70,12 @@ def claude_call(prompt, base, model, cwd, tools, max_turns):
 
 
 def codex_call(prompt, base, model, cwd, tools, max_turns):
-    """`codex exec` in a read-only sandbox; the model is DEEP_REVIEW_CODEX_MODEL or Codex's default. No cost report."""
+    """`codex exec` in a read-only sandbox; the model is REPTILE_CODEX_MODEL or Codex's default. No cost report."""
     last = base + ".last.txt"
     args = ["codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "-C", cwd,
             "--json", "--output-last-message", last]
-    if os.environ.get("DEEP_REVIEW_CODEX_MODEL"):
-        args += ["--model", os.environ["DEEP_REVIEW_CODEX_MODEL"]]
+    if os.environ.get("REPTILE_CODEX_MODEL"):
+        args += ["--model", os.environ["REPTILE_CODEX_MODEL"]]
     if os.path.exists(last):
         os.remove(last)
     try:

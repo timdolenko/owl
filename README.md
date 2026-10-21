@@ -1,49 +1,49 @@
-# deep-pr-review (Reptile)
+# reptile (Reptile)
 
 A Greptile-style pull request reviewer packaged as an agent skill for Claude Code and Codex CLI. It reviews a PR or branch diff with several parallel read-only model reviewers, posts the result as one GitHub review by "Reptile", and gives the fixing agent a command to answer each comment.
 
 ## Install
 
 ```bash
-git clone <this repository> deep-pr-review && cd deep-pr-review
+git clone <this repository> reptile && cd reptile
 ./install.sh            # symlinks into ~/.claude/skills and ~/.codex/skills, creates the venv
 ./install.sh --claude   # or only one of them; --copy copies instead of linking
 ```
 
-The venv lives at `${DEEP_REVIEW_HOME:-~/.cache/deep-pr-review}/venv`. Requires Python 3.10+, `git`, `gh` (logged in) and `claude` or `codex`.
+The venv lives at `${REPTILE_HOME:-~/.cache/reptile}/venv`. Requires Python 3.10+, `git`, `gh` (logged in) and `claude` or `codex`.
 
-Add the run output to the reviewed repo's `.gitignore` (Reptile also writes `.deep-review/.gitignore` itself):
+Add the run output to the reviewed repo's `.gitignore` (Reptile also writes `.reptile/.gitignore` itself):
 
 ```
-.deep-review/*
-!.deep-review/notes/
+.reptile/*
+!.reptile/notes/
 ```
 
 ## Run
 
 ```bash
-scripts/deep_review.py review --pr 123                      # or no --pr: the branch against origin's default branch
-scripts/deep_review.py post --out .deep-review/<sha> --pr 123 --dry-run
-scripts/deep_review.py post --out .deep-review/<sha> --pr 123
-scripts/deep_review.py reply --pr 123 --comment <id> --status fixed --text "Guarded the await" --resolve
-scripts/deep_review.py memory --since 2026-01-01            # optional: team rules from past PR threads
-scripts/deep_review.py refresh                              # optional daily job: graph + wiki + new threads
+scripts/reptile.py review --pr 123                      # or no --pr: the branch against origin's default branch
+scripts/reptile.py post --out .reptile/<sha> --pr 123 --dry-run
+scripts/reptile.py post --out .reptile/<sha> --pr 123
+scripts/reptile.py reply --pr 123 --comment <id> --status fixed --text "Guarded the await" --resolve
+scripts/reptile.py memory --since 2026-01-01            # optional: team rules from past PR threads
+scripts/reptile.py refresh                              # optional daily job: graph + wiki + new threads
 ```
 
 ## Configuration
 
 | Variable | Default | |
 |---|---|---|
-| `DEEP_REVIEW_ENGINE` | `claude` | or `codex` (also `--engine`) |
-| `DEEP_REVIEW_MODEL` | `claude-opus-5-5` | reviewers and dedupe (claude) |
-| `DEEP_REVIEW_CHEAP_MODEL` | `claude-haiku-5-5` | wiki pages (claude) |
-| `DEEP_REVIEW_MEMORY_MODEL` | `claude-sonnet-5-5` | team rules and comment writing (claude) |
-| `DEEP_REVIEW_CODEX_MODEL` | Codex default | every call (codex) |
-| `DEEP_REVIEW_CLAUDE_CMD` | `claude` | command prefix, for a wrapper: `my-proxy run --` |
-| `DEEP_REVIEW_HOME` | `~/.cache/deep-pr-review` | venv, and per repo `<owner-repo>/` graph, wiki, memory |
-| `DEEP_REVIEW_CALL_TIMEOUT` | `3600` | seconds per model call |
+| `REPTILE_ENGINE` | `claude` | or `codex` (also `--engine`) |
+| `REPTILE_MODEL` | `claude-opus-5-5` | reviewers and dedupe (claude) |
+| `REPTILE_CHEAP_MODEL` | `claude-haiku-5-5` | wiki pages (claude) |
+| `REPTILE_MEMORY_MODEL` | `claude-sonnet-5-5` | team rules and comment writing (claude) |
+| `REPTILE_CODEX_MODEL` | Codex default | every call (codex) |
+| `REPTILE_CLAUDE_CMD` | `claude` | command prefix, for a wrapper: `my-proxy run --` |
+| `REPTILE_HOME` | `~/.cache/reptile` | venv, and per repo `<owner-repo>/` graph, wiki, memory |
+| `REPTILE_CALL_TIMEOUT` | `3600` | seconds per model call |
 
-Per-repo reviewer notes, if present, go into the prompts: `.deep-review/notes/all.md` (every reviewer) and `.deep-review/notes/<mode>.md` (for example `regressions.md`).
+Per-repo reviewer notes, if present, go into the prompts: `.reptile/notes/all.md` (every reviewer) and `.reptile/notes/<mode>.md` (for example `regressions.md`).
 
 ## How it works
 

@@ -1,9 +1,9 @@
 ---
-name: deep-pr-review
+name: reptile
 description: Reptile, a deep Greptile-style code review of a pull request or branch diff. Builds a repository graph and context packs per changed declaration (Swift), adds codebase wiki pages and team rules mined from past PR review threads, runs parallel read-only reviewers (per file, whole PR, clean-code, regressions) through Claude Code or Codex CLI, merges duplicates, and can post the result as one GitHub review and answer each comment after fixing. Use before requesting human or bot review of a PR or branch, when asked for a deep or thorough review, or as the review step of a pipeline. Costs about $5-7 per PR with Claude Opus; takes 5-20 minutes.
 ---
 
-# deep-pr-review (Reptile)
+# reptile (Reptile)
 
 Reptile reviews a diff the way Greptile does, then posts the result to the PR. It never changes code itself. You (the agent) fix the findings afterwards.
 
@@ -14,14 +14,14 @@ Reptile reviews a diff the way Greptile does, then posts the result to the PR. I
 Commit first. Reptile reviews commits, not uncommitted changes.
 
 ```bash
-"$SKILL_DIR/scripts/deep_review.py" review --pr <number>    # an open GitHub PR: title, body and base come from gh
-"$SKILL_DIR/scripts/deep_review.py" review                  # the current branch against origin's default branch
-"$SKILL_DIR/scripts/deep_review.py" review --base origin/develop --head HEAD
+"$SKILL_DIR/scripts/reptile.py" review --pr <number>    # an open GitHub PR: title, body and base come from gh
+"$SKILL_DIR/scripts/reptile.py" review                  # the current branch against origin's default branch
+"$SKILL_DIR/scripts/reptile.py" review --base origin/develop --head HEAD
 ```
 
-Useful options: `--engine codex` (or `DEEP_REVIEW_ENGINE=codex`), `--out <dir>`, `--modes clean-code,regressions` (the default), `--no-wiki`, `--no-memory`, `--dry-run` (writes every prompt and calls no model). Run it in the background or with a long timeout: it takes 5-20 minutes. The last lines it prints are `FINDINGS=<n>` and the path of `findings.md`.
+Useful options: `--engine codex` (or `REPTILE_ENGINE=codex`), `--out <dir>`, `--modes clean-code,regressions` (the default), `--no-wiki`, `--no-memory`, `--dry-run` (writes every prompt and calls no model). Run it in the background or with a long timeout: it takes 5-20 minutes. The last lines it prints are `FINDINGS=<n>` and the path of `findings.md`.
 
-The run directory (default `<repo>/.deep-review/<head-sha>/`) holds:
+The run directory (default `<repo>/.reptile/<head-sha>/`) holds:
 
 - `findings.md`: one line per finding, most severe first:
   `F<n> | sources | path:start-end | P0-P3 | category | confidence | problem | fix`.
@@ -34,8 +34,8 @@ A rerun on the same head commit reuses the answers already in the run directory.
 ## 2. Post
 
 ```bash
-"$SKILL_DIR/scripts/deep_review.py" post --out <run dir> --pr <number>              # --role auto
-"$SKILL_DIR/scripts/deep_review.py" post --out <run dir> --pr <number> --dry-run    # preview, no GitHub writes
+"$SKILL_DIR/scripts/reptile.py" post --out <run dir> --pr <number>              # --role auto
+"$SKILL_DIR/scripts/reptile.py" post --out <run dir> --pr <number> --dry-run    # preview, no GitHub writes
 ```
 
 - `--role auto` is `author` when the gh user opened the PR, else `reviewer`.
@@ -53,8 +53,8 @@ For each comment in `posted.json`, in severity order:
 4. Commit the fixes, then reply on each comment:
 
 ```bash
-"$SKILL_DIR/scripts/deep_review.py" reply --pr <number> --comment <id> --status fixed --text "<what changed>" --resolve
-"$SKILL_DIR/scripts/deep_review.py" reply --pr <number> --comment <id> --status declined --text "<reason, file:line>"
+"$SKILL_DIR/scripts/reptile.py" reply --pr <number> --comment <id> --status fixed --text "<what changed>" --resolve
+"$SKILL_DIR/scripts/reptile.py" reply --pr <number> --comment <id> --status declined --text "<reason, file:line>"
 ```
 
 `--sha` defaults to `HEAD`. Resolve only the threads you fixed. Then push.
@@ -63,4 +63,4 @@ Also look at the findings that were not posted (the unsure list in the Reptile b
 
 ## Setup
 
-`install.sh` (in the repository of this skill) creates the venv with `tree-sitter` and `tree-sitter-swift`. The scripts need `git`, `gh` (logged in) for `--pr`, `post`, `reply` and `memory`, and `claude` or `codex` on `PATH`. Optional, once per repository and then daily: `deep_review.py memory --since <YYYY-MM-DD>` (team rules from past PR review threads) and `deep_review.py refresh`.
+`install.sh` (in the repository of this skill) creates the venv with `tree-sitter` and `tree-sitter-swift`. The scripts need `git`, `gh` (logged in) for `--pr`, `post`, `reply` and `memory`, and `claude` or `codex` on `PATH`. Optional, once per repository and then daily: `reptile.py memory --since <YYYY-MM-DD>` (team rules from past PR review threads) and `reptile.py refresh`.

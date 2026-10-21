@@ -3,7 +3,7 @@
 #   ./install.sh [--claude] [--codex] [--copy]     default: both, as symlinks to this checkout
 set -euo pipefail
 SRC="$(cd "$(dirname "$0")" && pwd)"
-HOME_DIR="${DEEP_REVIEW_HOME:-$HOME/.cache/deep-pr-review}"
+HOME_DIR="${REPTILE_HOME:-$HOME/.cache/reptile}"
 TARGETS=() MODE=link
 for arg in "$@"; do
   case "$arg" in
@@ -17,7 +17,7 @@ done
 
 for dir in "${TARGETS[@]}"; do
   mkdir -p "$dir"
-  dest="$dir/deep-pr-review"
+  dest="$dir/reptile"
   if [ -e "$dest" ] || [ -L "$dest" ]; then
     [ "$(cd "$dest" 2>/dev/null && pwd -P)" = "$SRC" ] && { echo "already installed: $dest"; continue; }
     echo "exists, not touched: $dest (remove it to reinstall)" >&2; continue
