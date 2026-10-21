@@ -2,6 +2,11 @@
 
 Below are findings from several reviewers of one pull request. Merge findings that describe the same defect with the same root cause, so one fix resolves all of them. Keep the clearest scenario and fix, list every place it affects, and join the source names.
 
+Also merge:
+- all findings that ask for missing or better tests into one test finding that lists each case to cover, with the highest severity among them;
+- a P3 finding on lines a P0-P2 finding already covers with the same fix, into that finding;
+- findings that are the same problem in sibling places (two adapters, two views, two copies of a rule) into one that names every place.
+
 Drop nothing else. Do not judge whether a finding is right, important or in scope: a later step does that.
 
 Output every finding, most severe first, numbered from F1, one per line, nothing else:
