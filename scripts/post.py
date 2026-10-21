@@ -1,12 +1,13 @@
 """Posts a run's findings to its PR as one GitHub review by Reptile, with a summary of what was checked.
-Author role: low bar for inline comments, summary block in the PR description. Reviewer role: only P0-P2 with
+Author role: every finding inline (low confidence ones marked), summary block in the PR description. Reviewer role: only P0-P2 with
 confidence >= 0.75 inline, summary block in the review body. Writes <out>/posted.json."""
 import json, os, re, subprocess, sys
 import llm
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 START, END = "<!-- reptile:start -->", "<!-- reptile:end -->"
-RANGE = re.compile(r"^(\S+?):(\d+)(?:-(\d+))?$")
+LOW = 0.5
+RANGE = re.compile(r"^([^|]+?\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?")
 
 
 def gh(*args, stdin=None):
@@ -29,10 +30,12 @@ def parse_findings(text):
             continue
         f = [x.strip() for x in line.split(" | ")]
         i = next((k for k, x in enumerate(f) if RANGE.match(x)), None)
+        if i is None:  # a file with no line: the comment goes on its first changed line
+            i = next((k for k, x in enumerate(f) if k > 1 and re.match(r"^[^ ]*/[^|]*\.\w+$", x)), None)
         if i is None or len(f) < i + 6:
             continue
-        m = RANGE.match(f[i])
-        out.append({"id": f[0], "path": m.group(1), "start": int(m.group(2)), "end": int(m.group(3) or m.group(2)),
+        m = RANGE.match(f[i]) or re.match(r"^(.*)()()$", f[i])
+        out.append({"id": f[0], "path": m.group(1), "start": int(m.group(2) or 0), "end": int(m.group(3) or m.group(2) or 0),
                     "sev": f[i + 1], "category": f[i + 2], "confidence": confidence(f[i + 3]), "problem": f[i + 4],
                     "fix": " | ".join(f[i + 5:]), "line": line})
     return out
@@ -40,7 +43,7 @@ def parse_findings(text):
 
 def is_inline(f, role):
     if role == "author":
-        return f["confidence"] >= 0.5
+        return True
     return f["sev"] in ("P0", "P1", "P2") and f["confidence"] >= 0.75
 
 
@@ -51,7 +54,7 @@ def right_side(diff):
         if l.startswith("diff --git"):
             path = hunk = None
         elif hunk is None and l.startswith("+++ "):
-            path = l[6:] if l.startswith("+++ b/") else None
+            path = l[6:].rstrip("\t") if l.startswith("+++ b/") else None
         elif (m := re.match(r"@@ -\d+(?:,\d+)? \+(\d+)", l)) and path:
             hunk, line = [], int(m.group(1))
             files.setdefault(path, []).append(hunk)
@@ -88,13 +91,24 @@ def written_comments(findings, out):
 
 def review_comment(f, written, spot):
     start, end, moved = spot
-    body = written["body"]
+    title, _, rest = written["body"].partition("\n")
+    if f["confidence"] < LOW:
+        title += f"\n\n<sub>Low confidence ({f['confidence']:.2f}): check that the scenario is reachable before fixing.</sub>"
+    body = f"{title}\n{rest}".rstrip()
     if written.get("suggestion") and not moved:
         body += f"\n\n```suggestion\n{written['suggestion'].rstrip()}\n```"
+    body += fix_prompt(f, written["body"])
     c = {"path": f["path"], "line": end, "side": "RIGHT", "body": body}
     if start:
         c.update(start_line=start, start_side="RIGHT")
     return c
+
+
+def fix_prompt(f, text):
+    return ("\n\n<details><summary>Prompt to fix with AI</summary>\n\n`````markdown\n"
+            f"This is a comment left during a code review.\nPath: {f['path']}\nLines: {f['start']}-{f['end']}\n\n{text.strip()}\n\n"
+            "Verify the issue against the code first. If it is valid, fix it with the smallest change; if not, reply why.\n"
+            "`````\n</details>")
 
 
 def passed_rows(out):
@@ -127,8 +141,10 @@ def role_of(args, pr):
 
 
 def run(args):
-    if os.path.exists(f"{args.out}/posted.json") and not args.force and not args.dry_run:
-        sys.exit(f"{args.out}/posted.json exists: this run was posted already (--force to post again)")
+    prev = json.load(open(f"{args.out}/posted.json")) if os.path.exists(f"{args.out}/posted.json") else None
+    if prev and not args.force and not args.dry_run:
+        sys.exit(f"{args.out}/posted.json exists: this run was posted already (--force posts the findings not posted yet)")
+    done = (prev or {}).get("comments", {})
     pr = json.loads(gh("pr", "view", str(args.pr), "-R", args.nwo, "--json", "author,headRefOid,body"))
     role, meta = role_of(args, pr), json.load(open(f"{args.out}/meta.json"))
     if meta["head"] != pr["headRefOid"]:
@@ -136,11 +152,11 @@ def run(args):
     files = right_side(gh("pr", "diff", str(args.pr), "-R", args.nwo))
     findings = parse_findings(open(f"{args.out}/findings.md").read())
     spots = {f["id"]: place(f, files) for f in findings}
-    inline = [f for f in findings if is_inline(f, role) and spots[f["id"]]]
-    held = [f for f in findings if f not in inline]
+    inline = [f for f in findings if is_inline(f, role) and spots[f["id"]] and f["id"] not in done]
+    held = [f for f in findings if f not in inline and f["id"] not in done]
     written = written_comments(inline, args.out)
     comments = [review_comment(f, written[f["id"]], spots[f["id"]]) for f in inline]
-    block = summary_block(len(comments), held, passed_rows(args.out))
+    block = summary_block(len(comments) + len(done), held, passed_rows(args.out))
     counts = ", ".join(f"{s}: {n}" for s in ("P0", "P1", "P2", "P3") if (n := sum(f["sev"] == s for f in inline)))
     body = f"Reptile: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
     review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments,
@@ -149,11 +165,11 @@ def run(args):
         print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}\n\n# description block" +
               (f"\n{block}" if role == "author" else ": none (reviewer role, the block is in the review body)"))
         return
-    publish(args, role, review, inline, pr, block)
+    publish(args, role, review, inline, pr, block, done)
 
 
-def publish(args, role, review, inline, pr, block):
-    posted = {"pr": args.pr, "role": role, "comments": {}}
+def publish(args, role, review, inline, pr, block, done):
+    posted = {"pr": args.pr, "role": role, "comments": dict(done)}
     if review["comments"] or role == "reviewer":
         res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
                             stdin=json.dumps(review)))
