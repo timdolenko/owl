@@ -214,6 +214,7 @@ def parser():
     po.add_argument("--role", choices=("author", "reviewer", "auto"), default="auto",
                     help="author: comments + PR description block; reviewer: stricter bar, block in the review (auto: by gh user)")
     po.add_argument("--dry-run", action="store_true", help="print the review JSON and the description block; no GitHub writes")
+    po.add_argument("--min-confidence", type=float, default=0.75, help="reviewer role: lowest confidence posted inline (default 0.75)")
     po.add_argument("--no-llm", action="store_true", help="plain comments from the F-lines, no model call")
     po.add_argument("--force", action="store_true", help="post again although posted.json exists")
     rp = sub.add_parser("reply", parents=[base], help="reply to one posted comment and optionally resolve its thread")

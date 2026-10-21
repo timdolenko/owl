@@ -43,10 +43,10 @@ def parse_findings(text):
     return out
 
 
-def is_inline(f, role):
+def is_inline(f, role, bar=0.75):
     if role == "author":
         return f["confidence"] >= LOW
-    return f["sev"] in ("P0", "P1", "P2") and f["confidence"] >= 0.75
+    return f["sev"] in ("P0", "P1", "P2") and f["confidence"] >= bar
 
 
 def right_side(diff):
@@ -162,7 +162,7 @@ def run(args):
     files = right_side(gh("pr", "diff", str(args.pr), "-R", args.nwo))
     findings = parse_findings(open(f"{args.out}/findings.md").read())
     spots = {f["id"]: place(f, files) for f in findings}
-    inline = [f for f in findings if is_inline(f, role) and spots[f["id"]] and f["id"] not in done]
+    inline = [f for f in findings if is_inline(f, role, args.min_confidence) and spots[f["id"]] and f["id"] not in done]
     low = [f for f in findings if role == "author" and spots[f["id"]] and f["confidence"] < LOW and f["id"] not in done]
     held = [f for f in findings if f not in inline and f not in low and f["id"] not in done]
     written = written_comments(inline, args.out)
@@ -183,7 +183,7 @@ def run(args):
 def publish(args, role, review, inline, pr, block, done, low):
     posted = {"pr": args.pr, "role": role, "comments": dict(done), "grouped": [f["id"] for f in low]}
     if role == "reviewer" and not review["comments"]:
-        print("Reptile: nothing above the reviewer bar (P0-P2, confidence >= 0.75); nothing posted")
+        print(f"Reptile: nothing above the reviewer bar (P0-P2, confidence >= {args.min_confidence}); nothing posted")
         return
     if review["comments"] or low:
         res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
