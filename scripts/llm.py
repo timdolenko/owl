@@ -7,8 +7,6 @@ API_ERROR = re.compile(r"^\s*API Error\b", re.I)
 MAX_WAIT = 4 * 3600
 CALL_TIMEOUT = int(os.environ.get("REPTILE_CALL_TIMEOUT", 3600))
 DRY = "(dry run: no model was called)\nNONE\nNO_FINDINGS"
-WRAP_UP = ("You reached the turn limit. Stop reading files and write your answer now, in exactly the output format "
-           "the instructions ask for, from what you have checked so far.")
 
 
 class CallFailed(RuntimeError):
@@ -50,12 +48,10 @@ def ask(prompt, base, model=None, cwd=None, tools=False, max_turns=None):
             raise CallFailed(f"{base}: no answer after {failures} tries")
 
 
-def claude_call(prompt, base, model, cwd, tools, max_turns, resume=None):
-    """`claude -p` with read-only tools; REPTILE_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy).
-    A reviewer that runs out of turns is resumed once and asked for its answer, so its reading is not thrown away."""
+def claude_call(prompt, base, model, cwd, tools, max_turns):
+    """`claude -p` with read-only tools; REPTILE_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
     args = shlex.split(os.environ.get("REPTILE_CLAUDE_CMD", "claude"))
-    args += ["--resume", resume] if resume else []
-    args += ["-p", WRAP_UP if resume else prompt, "--model", model, "--output-format", "json", "--dangerously-skip-permissions"]
+    args += ["-p", prompt, "--model", model, "--output-format", "json", "--dangerously-skip-permissions"]
     args += ["--disallowedTools", "Edit", "Write", "NotebookEdit", "Agent", "WebFetch", "WebSearch"] if tools else ["--tools", ""]
     if max_turns:
         args += ["--max-turns", str(max_turns)]
@@ -70,10 +66,6 @@ def claude_call(prompt, base, model, cwd, tools, max_turns, resume=None):
     if line and text.strip() and not res.get("is_error") and not API_ERROR.search(text):
         open(base + ".claude.json", "w").write(line)
         return text, res.get("total_cost_usd", 0.0), out
-    if res.get("subtype") == "error_max_turns" and res.get("session_id") and not resume:
-        open(base + ".err", "a").write(f"--- {time.ctime()}\nturn limit reached, asking the same session for its answer\n")
-        text, cost, more = claude_call(prompt, base, model, cwd, tools, 3, resume=res["session_id"])
-        return text, cost + (res.get("total_cost_usd") or 0.0), more
     return None, 0.0, text or out
 
 
