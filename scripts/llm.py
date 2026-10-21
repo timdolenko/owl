@@ -19,7 +19,7 @@ MEMORY = os.environ.get("REPTILE_MEMORY_MODEL", "claude-sonnet-5-5")
 DRY_RUN = False
 
 
-def ask(prompt, base, model=None, cwd=None, tools=False, max_turns=None):
+def ask(prompt, base, model=None, cwd=None, tools=False):
     """Returns (text, cost). Files: <base>.prompt, <base>.claude.json or .codex.jsonl, <base>.txt.
     Cached: an existing .txt is reused."""
     if os.path.exists(base + ".txt") and os.path.getsize(base + ".txt"):
@@ -33,7 +33,7 @@ def ask(prompt, base, model=None, cwd=None, tools=False, max_turns=None):
     call = codex_call if ENGINE == "codex" else claude_call
     waited, delay, failures = 0, 60, 0
     while True:
-        text, cost, out = call(prompt, base, model or MODEL, cwd or tempfile.gettempdir(), tools, max_turns)
+        text, cost, out = call(prompt, base, model or MODEL, cwd or tempfile.gettempdir(), tools)
         if text is not None:
             open(base + ".txt", "w").write(text)
             return text, cost
@@ -48,13 +48,11 @@ def ask(prompt, base, model=None, cwd=None, tools=False, max_turns=None):
             raise CallFailed(f"{base}: no answer after {failures} tries")
 
 
-def claude_call(prompt, base, model, cwd, tools, max_turns):
+def claude_call(prompt, base, model, cwd, tools):
     """`claude -p` with read-only tools; REPTILE_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
     args = shlex.split(os.environ.get("REPTILE_CLAUDE_CMD", "claude"))
     args += ["-p", prompt, "--model", model, "--output-format", "json", "--dangerously-skip-permissions"]
     args += ["--disallowedTools", "Edit", "Write", "NotebookEdit", "Agent", "WebFetch", "WebSearch"] if tools else ["--tools", ""]
-    if max_turns:
-        args += ["--max-turns", str(max_turns)]
     try:
         r = subprocess.run(args, capture_output=True, text=True, cwd=cwd, timeout=CALL_TIMEOUT)
     except subprocess.TimeoutExpired:
@@ -69,7 +67,7 @@ def claude_call(prompt, base, model, cwd, tools, max_turns):
     return None, 0.0, text or out
 
 
-def codex_call(prompt, base, model, cwd, tools, max_turns):
+def codex_call(prompt, base, model, cwd, tools):
     """`codex exec` in a read-only sandbox; the model is REPTILE_CODEX_MODEL or Codex's default. No cost report."""
     last = base + ".last.txt"
     args = ["codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "-C", cwd,

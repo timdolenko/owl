@@ -10,7 +10,6 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROMPTS = os.path.join(ROOT, "prompts")
 MODES = os.path.join(ROOT, "modes")
 MAX_UNITS = 8
-UNIT_TURNS = 30
 
 
 def git(wt, *args):
@@ -92,7 +91,7 @@ def mode_lines(args, diff, packs_dir, mode, passed):
         f"\n## This run\n\nMode: {mode}\nBase commit: {args.base}\nThe worktree is at the PR's head commit; read any file you need.\n",
         "\n## Pull request\n", open(args.context).read()[:12000], *conversation(args), "\n## Diff\n```diff", diff[:90000], "```",
         "\n## Context packs\n", "\n".join(packs)[:60000]])
-    text, _ = llm.ask(prompt, f"{args.out}/{mode}", model=llm.MODEL, cwd=args.worktree, tools=True, max_turns=UNIT_TURNS)
+    text, _ = llm.ask(prompt, f"{args.out}/{mode}", model=llm.MODEL, cwd=args.worktree, tools=True)
     found = [l.strip() for l in text.splitlines() if re.match(r"^\s*[^|]+?\.\w+:\d+(-\d+)?\s*\|", l)]
     if not found and "NO_FINDINGS" not in text:
         raise llm.CallFailed(f"{mode} answered without findings or NO_FINDINGS: {text[:200]!r}")
@@ -149,7 +148,7 @@ def run(args):
     def review_unit(i_unit):
         i, unit = i_unit
         text, _ = llm.ask(unit_prompt(args, unit, f"{args.out}/packs", wiki_pages, rules, facts), f"{args.out}/units/u{i}",
-                          model=llm.MODEL, cwd=args.worktree, tools=True, max_turns=UNIT_TURNS)
+                          model=llm.MODEL, cwd=args.worktree, tools=True)
         passed.extend(passed_lines(text, f"unit{i}"))
         return [f"{l} | unit{i}" for l in findings_lines(text, f"unit{i}")]
 
@@ -166,7 +165,7 @@ def run(args):
                                   "\n## Facts\n", facts[:8000], "\n## Team rules\n", rules or "(none)",
                                   "\n## Codebase notes\n", notes(args, "all") or "(none)",
                                   "\n## Per-file findings already raised\n", "\n".join(per_file) or "(none)"])
-        text, _ = llm.ask(whole_prompt, f"{args.out}/whole", model=llm.MODEL, cwd=args.worktree, tools=True, max_turns=UNIT_TURNS)
+        text, _ = llm.ask(whole_prompt, f"{args.out}/whole", model=llm.MODEL, cwd=args.worktree, tools=True)
         steps.done("whole-PR pass")
         candidates = per_file + [f"{l} | whole" for l in findings_lines(text, "whole")]
         passed.extend(passed_lines(text, "whole"))
