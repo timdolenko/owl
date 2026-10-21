@@ -55,10 +55,17 @@ def passed_lines(text, source):
     return [f"{l.strip().strip('`')} | {source}" for l in text.splitlines() if PASSED.match(l)]
 
 
+def conversation(args, cap=30000):
+    """The PR's comments and threads so far: points already raised, answered or settled are not raised again."""
+    path = getattr(args, "conversation", "")
+    text = open(path).read().strip() if path and os.path.exists(path) else ""
+    return ["\n## Existing PR conversation (already raised or settled: do not repeat)\n", text[:cap]] if text else []
+
+
 def unit_prompt(args, unit, packs_dir, wiki_pages, rules, facts):
     paths = [f["path"] for f in unit]
     diff = git(args.worktree, "diff", f"{args.base}..{args.sha}", "--", *paths)
-    parts = [open(f"{PROMPTS}/file.md").read(), "\n## Pull request\n", open(args.context).read()[:12000],
+    parts = [open(f"{PROMPTS}/file.md").read(), "\n## Pull request\n", open(args.context).read()[:12000], *conversation(args),
              "\n## Files to review\n", "\n".join(f"- {p}" for p in paths), "\n## Diff of these files\n```diff", diff[:60000], "```"]
     if not args.no_packs:
         parts += ["\n## Context packs (from the repository graph at the head commit)\n"]
@@ -83,7 +90,7 @@ def mode_lines(args, diff, packs_dir, mode, passed):
     packs = [open(f"{packs_dir}/{f}").read() for f in sorted(os.listdir(packs_dir))] if os.path.isdir(packs_dir) else []
     prompt = "\n".join(rules + [
         f"\n## This run\n\nMode: {mode}\nBase commit: {args.base}\nThe worktree is at the PR's head commit; read any file you need.\n",
-        "\n## Pull request\n", open(args.context).read()[:12000], "\n## Diff\n```diff", diff[:90000], "```",
+        "\n## Pull request\n", open(args.context).read()[:12000], *conversation(args), "\n## Diff\n```diff", diff[:90000], "```",
         "\n## Context packs\n", "\n".join(packs)[:60000]])
     text, _ = llm.ask(prompt, f"{args.out}/{mode}", model=llm.MODEL, cwd=args.worktree, tools=True, max_turns=UNIT_TURNS)
     found = [l.strip() for l in text.splitlines() if re.match(r"^\s*[^|]+?\.\w+:\d+(-\d+)?\s*\|", l)]
@@ -94,8 +101,9 @@ def mode_lines(args, diff, packs_dir, mode, passed):
 
 
 def dedupe(args, raw):
-    """Merges findings with the same root cause and drops nothing: the filter dropped real hits."""
-    text, _ = llm.ask("\n".join([open(f"{PROMPTS}/dedupe.md").read(), "\n## Candidate findings\n", raw]), f"{args.out}/dedupe",
+    """Merges findings with the same root cause; drops only repeats of the PR conversation (the filter dropped real hits)."""
+    text, _ = llm.ask("\n".join([open(f"{PROMPTS}/dedupe.md").read(), *conversation(args), "\n## Candidate findings\n", raw]),
+                      f"{args.out}/dedupe",
                       model=llm.MODEL)
     kept = [l for l in text.splitlines() if re.match(r"^F\d+ \|", l)]
     if not kept:
@@ -153,6 +161,7 @@ def run(args):
         steps.done("per-file units")
         stat = git(args.worktree, "diff", "--stat", f"{args.base}..{args.sha}")
         whole_prompt = "\n".join([open(f"{PROMPTS}/whole.md").read(), "\n## Pull request\n", open(args.context).read()[:12000],
+                                  *conversation(args),
                                   "\n## Diffstat\n```", stat[-6000:], "```", "\n## Full diff\n```diff", diff[:90000], "```",
                                   "\n## Facts\n", facts[:8000], "\n## Team rules\n", rules or "(none)",
                                   "\n## Codebase notes\n", notes(args, "all") or "(none)",

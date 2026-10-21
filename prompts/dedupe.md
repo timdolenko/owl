@@ -7,6 +7,8 @@ Also merge:
 - a P3 finding on lines a P0-P2 finding already covers with the same fix, into that finding;
 - findings that are the same problem in sibling places (two adapters, two views, two copies of a rule) into one that names every place.
 
+Drop a finding that repeats a point the existing PR conversation below already raises (open or resolved) or that the author answered there, unless the finding says why that answer is wrong or the code still has the problem.
+
 Drop nothing else. Do not judge whether a finding is right, important or in scope: a later step does that.
 
 Output every finding, most severe first, numbered from F1, one per line, nothing else:

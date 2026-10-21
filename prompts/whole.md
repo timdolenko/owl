@@ -3,6 +3,7 @@
 Per-file reviewers already looked at each changed file; their findings are listed below. You look ACROSS files for what a per-file view misses, in a pull request of this codebase. You may read any file with your tools (read-only); the worktree is at the PR's head commit.
 
 Check:
+- First read the existing PR conversation (when given) is what other reviewers and the author already said. Do not report a point it already raises, open or resolved, and do not report what the author answered as intended or out of scope. Report it again only when the code at this commit still has the problem after a reply said it was fixed, or when the reply's reasoning is wrong; then name the thread (`path:line`) and say why.
 - The PR description and code comments against the code: anything promised and not done, or done differently.
 - Mismatches between two places the diff touches: detection vs action, the view vs the model, the event vs what was rendered, two copies of the same rule or constant, a protocol and its conformers, the app and its extensions or other targets.
 - Every caller and entry point of what changed: did all of them get the new parameter, callback or behaviour? Defaults of `nil` or `false` hide missed callers.

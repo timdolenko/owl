@@ -119,6 +119,10 @@ def cmd_review(args):
     os.makedirs(args.out, exist_ok=True)
     args.context = os.path.join(args.out, "context.md")
     open(args.context, "w").write(context)
+    args.conversation = os.path.join(args.out, "conversation.md") if args.pr else ""
+    if args.pr:
+        import conversation
+        open(args.conversation, "w").write(conversation.text(args.nwo, args.pr))
     args.worktree = worktree(args)
     try:
         count = review.run(args)

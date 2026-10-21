@@ -54,6 +54,10 @@ The acceptance criteria and product decisions are not up for review. Never propo
 - Code silenced on purpose with a lint ignore or a documented exception.
 - Missing client-side auth checks the backend enforces; logging URLs without query strings or other non-personal data.
 
+## The PR conversation
+
+The existing PR conversation (when given) is what other reviewers and the author already said. Do not report a point it already raises, open or resolved, and do not report what the author answered as intended or out of scope. Report it again only when the code at this commit still has the problem after a reply said it was fixed, or when the reply's reasoning is wrong; then name the thread (`path:line`) and say why.
+
 ## Always check, whatever your mode
 
 - Mismatches between two places the diff touches: the PR description or a code comment vs the code, detection vs action, the view vs the model, the event vs what was rendered, two copies of the same constant or lockfile.
