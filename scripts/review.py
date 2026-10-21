@@ -92,7 +92,8 @@ def mode_lines(args, diff, packs_dir, mode, passed):
         "\n## Pull request\n", open(args.context).read()[:12000], *conversation(args), "\n## Diff\n```diff", diff[:90000], "```",
         "\n## Context packs\n", "\n".join(packs)[:60000]])
     text, _ = llm.ask(prompt, f"{args.out}/{mode}", model=llm.MODEL, cwd=args.worktree, tools=True)
-    found = [l.strip() for l in text.splitlines() if re.match(r"^\s*[^|]+?\.\w+:\d+(-\d+)?\s*\|", l)]
+    lines = (l.strip().strip("`") for l in text.splitlines())
+    found = [l for l in lines if re.match(r"^[^|]+?\.\w+:\d+(-\d+)?(,\s*\d+(-\d+)?)*\s*\|", l)]
     if not found and "NO_FINDINGS" not in text:
         raise llm.CallFailed(f"{mode} answered without findings or NO_FINDINGS: {text[:200]!r}")
     passed.extend(passed_lines(text, mode))
