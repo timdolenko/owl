@@ -132,9 +132,8 @@ def summary_block(posted, low, held, passed):
     safe = [f"- {r[1]}" + (f" ({r[2]})" if len(r) > 2 else "") for r in passed if r[0] == "SAFE"]
     return "\n".join([START, f"**Code review done by Reptile**: {posted} issues posted as comments"
                       + (f" · {low} low confidence in the review summary" if low else "") + f" · {len(safe)} checked and safe"
-                      f" · {len(unsure)} unsure", "", f"<details><summary>Reptile review notes ({len(safe)} + {len(unsure)})</summary>",
-                      "", "**Unsure**", "", *(unsure or ["- none"]), "", "**Checked and safe**", "", *(safe or ["- none"]), "",
-                      "</details>", END])
+                      f" · {len(unsure)} unsure", *(["", f"<details><summary>Unsure ({len(unsure)})</summary>", "", *unsure, "",
+                      "</details>"] if unsure else []), END])
 
 
 def with_block(body, block):
