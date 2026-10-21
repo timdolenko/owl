@@ -42,8 +42,8 @@ def findings_lines(text, base=""):
 
 
 def notes(args, name):
-    """The repo's own reviewer notes: <repo>/.deep-review/notes/<name>.md."""
-    path = os.path.join(args.repo, ".deep-review", "notes", f"{name}.md")
+    """The repo's own reviewer notes: $DEEP_REVIEW_NOTES/<name>.md, else <repo>/.deep-review/notes/<name>.md."""
+    path = os.path.join(os.environ.get("DEEP_REVIEW_NOTES") or os.path.join(args.repo, ".deep-review", "notes"), f"{name}.md")
     return open(path).read() if os.path.exists(path) else ""
 
 
