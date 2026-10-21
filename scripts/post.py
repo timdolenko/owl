@@ -182,7 +182,10 @@ def run(args):
 
 def publish(args, role, review, inline, pr, block, done, low):
     posted = {"pr": args.pr, "role": role, "comments": dict(done), "grouped": [f["id"] for f in low]}
-    if review["comments"] or low or role == "reviewer":
+    if role == "reviewer" and not review["comments"]:
+        print("Reptile: nothing above the reviewer bar (P0-P2, confidence >= 0.75); nothing posted")
+        return
+    if review["comments"] or low:
         res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
                             stdin=json.dumps(review)))
         made = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews/{res['id']}/comments?per_page=100"))
