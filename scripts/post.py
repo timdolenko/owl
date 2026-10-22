@@ -90,18 +90,10 @@ def review_comment(f, written, spot):
     body = written["body"].rstrip()
     if written.get("suggestion") and not moved:
         body += f"\n\n```suggestion\n{written['suggestion'].rstrip()}\n```"
-    body += fix_prompt(f, written["body"])
     c = {"path": f["path"], "line": end, "side": "RIGHT", "body": body}
     if start:
         c.update(start_line=start, start_side="RIGHT")
     return c
-
-
-def fix_prompt(f, text):
-    return ("\n\n<details><summary>Prompt to fix with AI</summary>\n\n`````markdown\n"
-            f"This is a comment left during a code review.\nPath: {f['path']}\nLines: {f['start']}-{f['end']}\n\n{text.strip()}\n\n"
-            "Verify the issue against the code first. If it is valid, fix it with the smallest change; if not, reply why.\n"
-            "`````\n</details>")
 
 
 def passed_rows(out):
@@ -189,7 +181,7 @@ def publish(args, review, inline, done, reviewed_head):
         print("Reptile: no finding, but the PR head moved since the review; not approving. Review the new head.")
         return
     if not review["comments"]:
-        review.update(event="APPROVE", body="Reptile reviewed this PR and found no issues.")
+        review.update(event="APPROVE", body="")
     res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
                         stdin=json.dumps(review)))
     made = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews/{res['id']}/comments?per_page=100"))
