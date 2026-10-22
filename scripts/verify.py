@@ -3,6 +3,7 @@ changing. On the author's own PR, one fixer then fixes the valid findings in the
 import json, os, re, subprocess
 from concurrent.futures import ThreadPoolExecutor
 import llm
+from review import notes
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PARALLEL = 6
@@ -47,7 +48,8 @@ def verify_prompt(args, f):
     conversation = f"{args.out}/conversation.md"
     return "\n".join([open(f"{ROOT}/prompts/verify.md").read(), f"\nBase commit: {meta['base']}\nHead commit: {meta['head']}\n",
                       "## The finding\n", f["line"], "\n## Pull request\n", open(f"{args.out}/context.md").read()[:20000],
-                      "\n## PR conversation\n", open(conversation).read()[:20000] if os.path.exists(conversation) else "(none)"])
+                      "\n## PR conversation\n", open(conversation).read()[:20000] if os.path.exists(conversation) else "(none)",
+                      "\n## Codebase notes\n", notes(args, "all") or "(none)"])
 
 
 def fix(args, valid, verdict_of, title):

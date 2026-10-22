@@ -1,4 +1,4 @@
-"""Answers one posted review comment ("Fixed in <sha>: ..." or "Not changed: ...") and optionally resolves its thread."""
+"""Answers one posted review comment ("Fixed in <sha>: ..." or the reason) and optionally resolves its thread."""
 import json
 from post import gh
 
@@ -17,7 +17,7 @@ def thread_of(nwo, pr, comment):
 
 
 def run(args):
-    text = f"Fixed in {args.sha}: {args.text}" if args.status == "fixed" else f"Not changed: {args.text}"
+    text = f"Fixed in {args.sha}: {args.text}" if args.status == "fixed" else args.text
     gh("api", f"repos/{args.nwo}/pulls/{args.pr}/comments/{args.comment}/replies", "-f", f"body={text}")
     if args.resolve:
         gh("api", "graphql", "-f", f"query={RESOLVE}", "-f", f"id={thread_of(args.nwo, args.pr, args.comment)}")

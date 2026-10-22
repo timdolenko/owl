@@ -8,7 +8,7 @@ The working directory is the repository at the PR's head commit. The base commit
 
 1. **True?** Open the cited lines and the code around them: callers, other writers of the same state, and the types and APIs involved. Is the claimed behaviour real? Is the scenario reachable in this app (platform, targets, flags, build settings)?
 2. **Caused by this PR?** Run the same scenario on the base version. If the base behaves the same way, the finding is pre-existing: INVALID, unless this PR claims to fix exactly that.
-3. **Allowed by the ticket?** If the PR description, the ticket context or the PR conversation decided this behaviour on purpose, the finding is INVALID.
+3. **Allowed by the ticket?** If the PR description, the ticket context, the PR conversation or the codebase notes decided this behaviour on purpose, the finding is INVALID.
 4. **Worth changing?** INVALID when it asks for a test of trivial or private logic, a refactor of code the PR does not change, or a matter of taste with no written repository rule.
 5. **The fix is right?** The proposed fix must remove the defect without breaking an acceptance criterion or another caller. When the finding is true but its fix is wrong, it is still VALID: describe the right fix.
 
