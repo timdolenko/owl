@@ -199,4 +199,5 @@ def publish(args, review, inline, done, reviewed_head):
         if hit:
             posted["comments"][f["id"]] = {"id": hit["id"], "path": hit["path"], "line": c["line"], "url": hit["html_url"]}
     json.dump(posted, open(f"{args.out}/posted.json", "w"), indent=1)
-    print(f"Reptile posted {len(posted['comments'])} comments: {posted['review_url']}")
+    verb = "approved" if review["event"] == "APPROVE" else f"posted {len(posted['comments'])} comments"
+    print(f"Reptile {verb}: {posted['review_url']}")
