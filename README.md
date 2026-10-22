@@ -1,49 +1,49 @@
-# reptile (Reptile)
+# owl (Owl)
 
-A Greptile-style pull request reviewer packaged as an agent skill for Claude Code and Codex CLI. It reviews a PR or branch diff with several parallel read-only model reviewers, posts the result as one GitHub review by "Reptile", and gives the fixing agent a command to answer each comment.
+A Greptile-style pull request reviewer packaged as an agent skill for Claude Code and Codex CLI. It reviews a PR or branch diff with several parallel read-only model reviewers, posts the result as one GitHub review by "Owl", and gives the fixing agent a command to answer each comment.
 
 ## Install
 
 ```bash
-git clone <this repository> reptile && cd reptile
+git clone <this repository> owl && cd owl
 ./install.sh            # symlinks into ~/.claude/skills and ~/.codex/skills, creates the venv
 ./install.sh --claude   # or only one of them; --copy copies instead of linking
 ```
 
-The venv lives at `${REPTILE_HOME:-~/.cache/reptile}/venv`. Requires Python 3.10+, `git`, `gh` (logged in) and `claude` or `codex`.
+The venv lives at `${OWL_HOME:-~/.cache/owl}/venv`. Requires Python 3.10+, `git`, `gh` (logged in) and `claude` or `codex`.
 
-Add the run output to the reviewed repo's `.gitignore` (Reptile also writes `.reptile/.gitignore` itself):
+Add the run output to the reviewed repo's `.gitignore` (Owl also writes `.owl/.gitignore` itself):
 
 ```
-.reptile/*
-!.reptile/notes/
+.owl/*
+!.owl/notes/
 ```
 
 ## Run
 
 ```bash
-scripts/reptile.py review --pr 123                      # or no --pr: the branch against origin's default branch
-scripts/reptile.py post --out .reptile/<sha> --pr 123 --dry-run
-scripts/reptile.py post --out .reptile/<sha> --pr 123
-scripts/reptile.py reply --pr 123 --comment <id> --status fixed --text "Guarded the await" --resolve
-scripts/reptile.py memory --since 2026-01-01            # optional: team rules from past PR threads
-scripts/reptile.py refresh                              # optional daily job: graph + wiki + new threads
+scripts/owl.py review --pr 123                      # or no --pr: the branch against origin's default branch
+scripts/owl.py post --out .owl/<sha> --pr 123 --dry-run
+scripts/owl.py post --out .owl/<sha> --pr 123
+scripts/owl.py reply --pr 123 --comment <id> --status fixed --text "Guarded the await" --resolve
+scripts/owl.py memory --since 2026-01-01            # optional: team rules from past PR threads
+scripts/owl.py refresh                              # optional daily job: graph + wiki + new threads
 ```
 
 ## Configuration
 
 | Variable | Default | |
 |---|---|---|
-| `REPTILE_ENGINE` | `claude` | or `codex` (also `--engine`) |
-| `REPTILE_MODEL` | `claude-opus-5-5` | reviewers and dedupe (claude) |
-| `REPTILE_CHEAP_MODEL` | `claude-haiku-5-5` | wiki pages (claude) |
-| `REPTILE_MEMORY_MODEL` | `claude-sonnet-5-5` | team rules and comment writing (claude) |
-| `REPTILE_CODEX_MODEL` | Codex default | every call (codex) |
-| `REPTILE_CLAUDE_CMD` | `claude` | command prefix, for a wrapper: `my-proxy run --` |
-| `REPTILE_HOME` | `~/.cache/reptile` | venv, and per repo `<owner-repo>/` graph, wiki, memory |
-| `REPTILE_CALL_TIMEOUT` | `3600` | seconds per model call |
+| `OWL_ENGINE` | `claude` | or `codex` (also `--engine`) |
+| `OWL_MODEL` | `claude-opus-5-5` | reviewers and dedupe (claude) |
+| `OWL_CHEAP_MODEL` | `claude-haiku-5-5` | wiki pages (claude) |
+| `OWL_MEMORY_MODEL` | `claude-sonnet-5-5` | team rules and comment writing (claude) |
+| `OWL_CODEX_MODEL` | Codex default | every call (codex) |
+| `OWL_CLAUDE_CMD` | `claude` | command prefix, for a wrapper: `my-proxy run --` |
+| `OWL_HOME` | `~/.cache/owl` | venv, and per repo `<owner-repo>/` graph, wiki, memory |
+| `OWL_CALL_TIMEOUT` | `3600` | seconds per model call |
 
-Per-repo reviewer notes, if present, go into the prompts: `.reptile/notes/all.md` (every reviewer) and `.reptile/notes/<mode>.md` (for example `regressions.md`).
+Per-repo reviewer notes, if present, go into the prompts: `.owl/notes/all.md` (every reviewer) and `.owl/notes/<mode>.md` (for example `regressions.md`).
 
 ## How it works
 

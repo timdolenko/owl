@@ -1,14 +1,14 @@
-"""Verifies each finding (verify.py), then publishes. Author role (your own PR): Reptile fixes the valid findings,
+"""Verifies each finding (verify.py), then publishes. Author role (your own PR): Owl fixes the valid findings,
 commits and pushes, and posts no comments; what it fixed, what it checked and did not change, and what it could not
 check go folded into the PR description, for the author and for Greptile. Reviewer role (someone else's PR): only
-verified P0-P2 findings are posted inline, with a suggestion when the fix is small; with none, Reptile approves the PR.
+verified P0-P2 findings are posted inline, with a suggestion when the fix is small; with none, Owl approves the PR.
 Writes <out>/posted.json."""
 import json, os, re, subprocess, sys
 from urllib.parse import quote
 import llm, verify
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-START, END = "<!-- reptile:start -->", "<!-- reptile:end -->"
+START, END = "<!-- owl:start -->", "<!-- owl:end -->"
 RANGE = re.compile(r"^([^|]+?\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?")
 
 
@@ -109,15 +109,16 @@ def summary_block(findings, fixed, declined, passed):
     unsure = [f"- {r[1]}. Manual step: {r[2] if len(r) > 2 else 'unknown'}" for r in passed if r[0] == "NOT CONFIRMED"]
     safe = sum(r[0] == "SAFE" for r in passed)
     fold = lambda title, rows: ["", f"<details><summary>{title} ({len(rows)})</summary>", "", *rows, "", "</details>"] if rows else []
-    return "\n".join([START, f"**Code review done by Reptile**: {len(done)} found and fixed · {len(kept)} checked and not changed"
+    return "\n".join([START, f"**Code review done by Owl**: {len(done)} found and fixed · {len(kept)} checked and not changed"
                       f" · {safe} checked and safe · {len(unsure)} unsure", *fold("Fixed", done),
                       *fold("Checked and not changed", kept), *fold("Unsure", unsure), END])
 
 
 def with_block(body, block):
     body = body or ""
-    if START in body and END in body:
-        return re.sub(re.escape(START) + r".*?" + re.escape(END), lambda _: block, body, flags=re.S)
+    old = re.compile(r"<!-- (owl|reptile):start -->.*?<!-- (owl|reptile):end -->", re.S)
+    if old.search(body):
+        return old.sub(lambda _: block, body, count=1)
     return f"{body.rstrip()}\n\n{block}\n".lstrip()
 
 
@@ -150,7 +151,7 @@ def run(args):
         written[f["id"]]["suggestion"] = verdict_of[f["id"]]["suggestion"] or written[f["id"]].get("suggestion")
     comments = [review_comment(f, written[f["id"]], spots[f["id"]]) for f in inline]
     counts = ", ".join(f"{s}: {n}" for s in ("P0", "P1", "P2") if (n := sum(f["sev"] == s for f in inline)))
-    body = f"Reptile: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
+    body = f"Owl: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
     review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments, "body": body}
     if args.dry_run:
         print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}")
@@ -169,16 +170,16 @@ def publish_author(args, pr, findings, valid, verdict_of, declined):
     open(f"{args.out}/pr-body.md", "w").write(with_block(pr["body"], block))
     gh("pr", "edit", str(args.pr), "-R", args.nwo, "--body-file", f"{args.out}/pr-body.md")
     json.dump({"pr": args.pr, "role": "author", "fixed": fixed, "declined": declined}, open(f"{args.out}/posted.json", "w"), indent=1)
-    print(f"Reptile fixed {len(fixed)} findings and pushed; {len(declined)} not changed; notes in the PR description")
+    print(f"Owl fixed {len(fixed)} findings and pushed; {len(declined)} not changed; notes in the PR description")
 
 
 def publish(args, review, inline, done, reviewed_head):
     posted = {"pr": args.pr, "role": "reviewer", "comments": dict(done)}
     if not review["comments"] and done:
-        print("Reptile: no new verified P0-P2 finding; nothing posted")
+        print("Owl: no new verified P0-P2 finding; nothing posted")
         return
     if not review["comments"] and not reviewed_head:
-        print("Reptile: no finding, but the PR head moved since the review; not approving. Review the new head.")
+        print("Owl: no finding, but the PR head moved since the review; not approving. Review the new head.")
         return
     if not review["comments"]:
         review.update(event="APPROVE", body="")
@@ -192,4 +193,4 @@ def publish(args, review, inline, done, reviewed_head):
             posted["comments"][f["id"]] = {"id": hit["id"], "path": hit["path"], "line": c["line"], "url": hit["html_url"]}
     json.dump(posted, open(f"{args.out}/posted.json", "w"), indent=1)
     verb = "approved" if review["event"] == "APPROVE" else f"posted {len(posted['comments'])} comments"
-    print(f"Reptile {verb}: {posted['review_url']}")
+    print(f"Owl {verb}: {posted['review_url']}")

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""reptile (Reptile): Greptile-style review of a PR or branch with Claude Code or Codex CLI.
+"""owl (Owl): Greptile-style review of a PR or branch with Claude Code or Codex CLI.
 
-  reptile.py [review] [--pr N | --base REF --head REF]   review a diff, write findings.md
-  reptile.py index [--sha REF]                            repo graph + wiki for a commit
-  reptile.py memory [--since YYYY-MM-DD]                  past PR review threads -> team rules
-  reptile.py refresh                                      index the default branch + memory of the last 2 days
-  reptile.py post --out RUN --pr N [--role auto]          post findings as one GitHub review by Reptile
-  reptile.py reply --pr N --comment ID --status fixed     answer (and resolve) one posted comment
+  owl.py [review] [--pr N | --base REF --head REF]   review a diff, write findings.md
+  owl.py index [--sha REF]                            repo graph + wiki for a commit
+  owl.py memory [--since YYYY-MM-DD]                  past PR review threads -> team rules
+  owl.py refresh                                      index the default branch + memory of the last 2 days
+  owl.py post --out RUN --pr N [--role auto]          post findings as one GitHub review by Owl
+  owl.py reply --pr N --comment ID --status fixed     answer (and resolve) one posted comment
 
-Data (graph, wiki, memory): ${REPTILE_HOME:-~/.cache/reptile}/<owner-repo>/.
-Engine: --engine or REPTILE_ENGINE (claude | codex)."""
+Data (graph, wiki, memory): ${OWL_HOME:-~/.cache/owl}/<owner-repo>/.
+Engine: --engine or OWL_ENGINE (claude | codex)."""
 import argparse, datetime, json, os, re, shutil, subprocess, sys
 
-HOME = os.path.expanduser(os.environ.get("REPTILE_HOME", "~/.cache/reptile"))
+HOME = os.path.expanduser(os.environ.get("OWL_HOME", "~/.cache/owl"))
 VENV = os.path.join(HOME, "venv")
 MODES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "modes")
 COMMANDS = ("review", "index", "memory", "refresh", "post", "reply")
@@ -101,7 +101,7 @@ def worktree(args):
 
 def ignore_runs(repo):
     """Keeps run output out of commits; notes/ stays committable."""
-    path = os.path.join(repo, ".reptile", ".gitignore")
+    path = os.path.join(repo, ".owl", ".gitignore")
     if not os.path.exists(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         open(path, "w").write("/*\n!/notes/\n")
@@ -117,7 +117,7 @@ def cmd_review(args):
     if args.context_file:
         context += "\n## Ticket context from the author (not public)\n\n" + open(args.context_file).read()
     ignore_runs(args.repo)
-    args.out = os.path.abspath(args.out or os.path.join(args.repo, ".reptile", args.sha))
+    args.out = os.path.abspath(args.out or os.path.join(args.repo, ".owl", args.sha))
     os.makedirs(args.out, exist_ok=True)
     args.context = os.path.join(args.out, "context.md")
     open(args.context, "w").write(context)
@@ -189,17 +189,17 @@ def days_ago(n):
 def parser():
     base = argparse.ArgumentParser(add_help=False)
     base.add_argument("--repo", help="git repository (default: the one containing the current directory)")
-    base.add_argument("--engine", choices=("claude", "codex"), default=os.environ.get("REPTILE_ENGINE", "claude"))
+    base.add_argument("--engine", choices=("claude", "codex"), default=os.environ.get("OWL_ENGINE", "claude"))
     common = argparse.ArgumentParser(add_help=False, parents=[base])
     common.add_argument("--dry-run", action="store_true", help="build everything and write every prompt, call no model")
-    p = argparse.ArgumentParser(prog="reptile.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(prog="owl.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", metavar="{review,index,memory,refresh,post,reply}")
     r = sub.add_parser("review", parents=[common], help="review a PR or branch diff (default)")
     r.add_argument("--base", help="base ref (default: merge-base with origin's default branch, or the PR's base)")
     r.add_argument("--head", help="head ref (default: HEAD, or the PR's head commit)")
     r.add_argument("--pr", type=int, help="GitHub PR number: title, body and base come from `gh pr view`")
-    r.add_argument("--context", dest="context_file", default=os.environ.get("REPTILE_CONTEXT"), help="extra context file (ticket, acceptance criteria), added to the PR description")
-    r.add_argument("--out", help="run directory (default: <repo>/.reptile/<head-sha>)")
+    r.add_argument("--context", dest="context_file", default=os.environ.get("OWL_CONTEXT"), help="extra context file (ticket, acceptance criteria), added to the PR description")
+    r.add_argument("--out", help="run directory (default: <repo>/.owl/<head-sha>)")
     r.add_argument("--modes", default="clean-code,regressions", help="single-mode reviewers, comma separated ('' for none)")
     for flag, text in (("--no-wiki", "skip the per-area wiki pages"), ("--no-memory", "skip team rules from past reviews"),
                        ("--no-packs", "skip the graph context packs"), ("--no-dedupe", "keep every raw candidate"),

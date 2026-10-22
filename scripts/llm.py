@@ -5,17 +5,17 @@ import json, os, re, shlex, subprocess, tempfile, time
 LIMIT = re.compile(r"rate.?limit|\b429\b|quota|overloaded|usage limit|temporarily limiting|Proxy not running|ECONNREFUSED|socket hang up", re.I)
 API_ERROR = re.compile(r"^\s*API Error\b", re.I)
 MAX_WAIT = 4 * 3600
-CALL_TIMEOUT = int(os.environ.get("REPTILE_CALL_TIMEOUT", 3600))
+CALL_TIMEOUT = int(os.environ.get("OWL_CALL_TIMEOUT", 3600))
 DRY = "(dry run: no model was called)\nNONE\nNO_FINDINGS"
 
 
 class CallFailed(RuntimeError):
     pass
 
-ENGINE = os.environ.get("REPTILE_ENGINE", "claude")
-MODEL = os.environ.get("REPTILE_MODEL", "claude-opus-5-5")
-CHEAP = os.environ.get("REPTILE_CHEAP_MODEL", "claude-haiku-5-5")
-MEMORY = os.environ.get("REPTILE_MEMORY_MODEL", "claude-sonnet-5-5")
+ENGINE = os.environ.get("OWL_ENGINE", "claude")
+MODEL = os.environ.get("OWL_MODEL", "claude-opus-5-5")
+CHEAP = os.environ.get("OWL_CHEAP_MODEL", "claude-haiku-5-5")
+MEMORY = os.environ.get("OWL_MEMORY_MODEL", "claude-sonnet-5-5")
 DRY_RUN = False
 
 
@@ -49,8 +49,8 @@ def ask(prompt, base, model=None, cwd=None, tools=False):
 
 
 def claude_call(prompt, base, model, cwd, tools):
-    """`claude -p` with read-only tools, or edit tools when tools is "write"; REPTILE_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
-    args = shlex.split(os.environ.get("REPTILE_CLAUDE_CMD", "claude"))
+    """`claude -p` with read-only tools, or edit tools when tools is "write"; OWL_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
+    args = shlex.split(os.environ.get("OWL_CLAUDE_CMD", "claude"))
     args += ["-p", prompt, "--model", model, "--output-format", "json", "--dangerously-skip-permissions"]
     read_only = [] if tools == "write" else ["Edit", "Write", "NotebookEdit"]
     args += ["--disallowedTools", *read_only, "Agent", "WebFetch", "WebSearch"] if tools else ["--tools", ""]
@@ -69,12 +69,12 @@ def claude_call(prompt, base, model, cwd, tools):
 
 
 def codex_call(prompt, base, model, cwd, tools):
-    """`codex exec` in a read-only sandbox (workspace-write when tools is "write"); the model is REPTILE_CODEX_MODEL or Codex's default. No cost report."""
+    """`codex exec` in a read-only sandbox (workspace-write when tools is "write"); the model is OWL_CODEX_MODEL or Codex's default. No cost report."""
     last = base + ".last.txt"
     args = ["codex", "exec", "--sandbox", "workspace-write" if tools == "write" else "read-only", "--skip-git-repo-check", "--ephemeral", "-C", cwd,
             "--json", "--output-last-message", last]
-    if os.environ.get("REPTILE_CODEX_MODEL"):
-        args += ["--model", os.environ["REPTILE_CODEX_MODEL"]]
+    if os.environ.get("OWL_CODEX_MODEL"):
+        args += ["--model", os.environ["OWL_CODEX_MODEL"]]
     if os.path.exists(last):
         os.remove(last)
     try:

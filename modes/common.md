@@ -8,7 +8,7 @@ The goal is that a later reviewer (a human or a review bot) finds nothing left t
 
 - **Range:** `git diff origin/<base>...HEAD` (or `git merge-base HEAD <base>` for a branch). The diff is the primary artifact.
 - **Review context file** (when given): task and ticket, acceptance criteria, product decisions, what QA already covered, paths to test, edge cases, regression areas, adjacent features, and the log of findings already decided. Read it first. Do not raise a declined finding again unless the new code changes the reason.
-- **Codebase notes** (when given): the repo's `AGENTS.md` / `CLAUDE.md` files on the path of each changed file (the most specific wins), the codebase notes for your mode (`.reptile/notes/`), and the knowledge base pages for the areas the diff touches. They describe how this codebase works and what tends to break in it; use them to know where to look, and cite them when a finding rests on one of their rules.
+- **Codebase notes** (when given): the repo's `AGENTS.md` / `CLAUDE.md` files on the path of each changed file (the most specific wins), the codebase notes for your mode (`.owl/notes/`), and the knowledge base pages for the areas the diff touches. They describe how this codebase works and what tends to break in it; use them to know where to look, and cite them when a finding rests on one of their rules.
 - **Existing signals** (when given): CI check results and comments already on the PR. Confirm or dismiss them; do not repeat them.
 - **Focus** (when given): an area the requester named. Cover it explicitly and say what you found, even if nothing.
 
