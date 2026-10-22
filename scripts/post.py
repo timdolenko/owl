@@ -1,14 +1,14 @@
-"""Posts a run's findings to its PR as one GitHub review by Reptile, with a summary of what was checked.
-Author role: findings with confidence >= 0.5 inline, the rest as one list in the review summary, notes block in the
-PR description. Reviewer role (someone else's PR): only P0-P2 with
-confidence >= 0.75 inline, nothing else posted. Writes <out>/posted.json."""
+"""Verifies each finding (verify.py), then publishes. Author role (your own PR): Reptile fixes the valid findings,
+commits and pushes, and posts no comments; what it fixed, what it checked and did not change, and what it could not
+check go folded into the PR description, for the author and for Greptile. Reviewer role (someone else's PR): only
+verified P0-P2 findings are posted inline, with a suggestion when the fix is small; nothing else.
+Writes <out>/posted.json."""
 import json, os, re, subprocess, sys
 from urllib.parse import quote
-import llm
+import llm, verify
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 START, END = "<!-- reptile:start -->", "<!-- reptile:end -->"
-LOW = 0.5
 RANGE = re.compile(r"^([^|]+?\.[A-Za-z0-9]+):(\d+)(?:-(\d+))?")
 
 
@@ -41,12 +41,6 @@ def parse_findings(text):
                     "sev": f[i + 1], "category": f[i + 2], "confidence": confidence(f[i + 3]), "problem": f[i + 4],
                     "fix": " | ".join(f[i + 5:]), "line": line})
     return out
-
-
-def is_inline(f, role, bar=0.75):
-    if role == "author":
-        return f["confidence"] >= LOW
-    return f["sev"] in ("P0", "P1", "P2") and f["confidence"] >= bar
 
 
 def right_side(diff):
@@ -110,30 +104,22 @@ def fix_prompt(f, text):
             "`````\n</details>")
 
 
-def low_confidence_list(findings, nwo, sha):
-    """One summary list instead of a thread each: most findings under LOW turn out wrong or not worth changing."""
-    if not findings:
-        return ""
-    rows = [f"- **{f['sev']}** [`{f['path'].rsplit('/', 1)[-1]}:{f['start']}`]"
-            f"(https://github.com/{nwo}/blob/{sha}/{quote(f['path'])}#L{f['start']}-L{f['end']}) "
-            f"{f['problem']} Fix: {f['fix']} ({f['id']}, confidence {f['confidence']:.2f})" for f in findings]
-    return "\n".join(["", "", f"**Low confidence ({len(findings)})**: check that each is reachable before changing anything.", "", *rows])
-
-
 def passed_rows(out):
     path = f"{out}/passed.md"
     return [[x.strip() for x in l.split(" | ")] for l in open(path).read().splitlines() if l.strip()] if os.path.exists(path) else []
 
 
-def summary_block(posted, low, held, passed):
-    unsure = [f"- {f['sev']} `{f['path']}:{f['start']}-{f['end']}` {f['problem']} Fix: {f['fix']} (confidence {f['confidence']})"
-              for f in held]
-    unsure = [f"- {r[1]}. Manual step: {r[2] if len(r) > 2 else 'unknown'}" for r in passed if r[0] == "NOT CONFIRMED"] + unsure
-    safe = [f"- {r[1]}" + (f" ({r[2]})" if len(r) > 2 else "") for r in passed if r[0] == "SAFE"]
-    return "\n".join([START, f"**Code review done by Reptile**: {posted} issues posted as comments"
-                      + (f" · {low} low confidence in the review summary" if low else "") + f" · {len(safe)} checked and safe"
-                      f" · {len(unsure)} unsure", *(["", f"<details><summary>Unsure ({len(unsure)})</summary>", "", *unsure, "",
-                      "</details>"] if unsure else []), END])
+def summary_block(findings, fixed, declined, passed):
+    by_id = {f["id"]: f for f in findings}
+    row = lambda i: f"- {by_id[i]['sev']} `{by_id[i]['path'].rsplit('/', 1)[-1]}:{by_id[i]['start']}` {by_id[i]['problem'][:300]}"
+    done = [f"{row(i)} **Fixed** in {x['sha'][:10]}: {x['what']}" for i, x in fixed.items() if i in by_id]
+    kept = [f"{row(i)} **Not changed:** {why}" for i, why in declined.items() if i in by_id]
+    unsure = [f"- {r[1]}. Manual step: {r[2] if len(r) > 2 else 'unknown'}" for r in passed if r[0] == "NOT CONFIRMED"]
+    safe = sum(r[0] == "SAFE" for r in passed)
+    fold = lambda title, rows: ["", f"<details><summary>{title} ({len(rows)})</summary>", "", *rows, "", "</details>"] if rows else []
+    return "\n".join([START, f"**Code review done by Reptile**: {len(done)} found and fixed · {len(kept)} checked and not changed"
+                      f" · {safe} checked and safe · {len(unsure)} unsure", *fold("Fixed", done),
+                      *fold("Checked and not changed", kept), *fold("Unsure", unsure), END])
 
 
 def with_block(body, block):
@@ -154,48 +140,58 @@ def run(args):
     if prev and not args.force and not args.dry_run:
         sys.exit(f"{args.out}/posted.json exists: this run was posted already (--force posts the findings not posted yet)")
     done = (prev or {}).get("comments", {})
-    pr = json.loads(gh("pr", "view", str(args.pr), "-R", args.nwo, "--json", "author,headRefOid,body"))
+    pr = json.loads(gh("pr", "view", str(args.pr), "-R", args.nwo, "--json", "author,headRefOid,body,title"))
     role, meta = role_of(args, pr), json.load(open(f"{args.out}/meta.json"))
     if meta["head"] != pr["headRefOid"]:
         print(f"warning: run reviewed {meta['head'][:10]}, PR head is {pr['headRefOid'][:10]}; lines may be off", file=sys.stderr)
-    files = right_side(gh("pr", "diff", str(args.pr), "-R", args.nwo))
     findings = parse_findings(open(f"{args.out}/findings.md").read())
-    spots = {f["id"]: place(f, files) for f in findings}
-    inline = [f for f in findings if is_inline(f, role, args.min_confidence) and spots[f["id"]] and f["id"] not in done]
-    low = [f for f in findings if role == "author" and spots[f["id"]] and f["confidence"] < LOW and f["id"] not in done]
-    held = [f for f in findings if f not in inline and f not in low and f["id"] not in done]
-    written = written_comments(inline, args.out)
-    comments = [review_comment(f, written[f["id"]], spots[f["id"]]) for f in inline]
-    block = summary_block(len(comments) + len(done), len(low), held, passed_rows(args.out))
-    counts = ", ".join(f"{s}: {n}" for s in ("P0", "P1", "P2", "P3") if (n := sum(f["sev"] == s for f in inline)))
-    body = f"Reptile: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
-    body += low_confidence_list(low, args.nwo, pr["headRefOid"])
-    review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments,
-              "body": body}
-    if args.dry_run:
-        print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}\n\n# description block" +
-              (f"\n{block}" if role == "author" else ": none (reviewer role: only high-confidence comments are posted)"))
-        return
-    publish(args, role, review, inline, pr, block, done, low)
-
-
-def publish(args, role, review, inline, pr, block, done, low):
-    posted = {"pr": args.pr, "role": role, "comments": dict(done), "grouped": [f["id"] for f in low]}
-    if role == "reviewer" and not review["comments"]:
-        print(f"Reptile: nothing above the reviewer bar (P0-P2, confidence >= {args.min_confidence}); nothing posted")
-        return
-    if review["comments"] or low:
-        res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
-                            stdin=json.dumps(review)))
-        made = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews/{res['id']}/comments?per_page=100"))
-        posted.update(review_id=res["id"], review_url=res.get("html_url"))
-        for f, c in zip(inline, review["comments"]):
-            hit = next((m for m in made if m["path"] == c["path"] and m["body"].strip() == c["body"].strip()), None)
-            if hit:
-                posted["comments"][f["id"]] = {"id": hit["id"], "path": hit["path"], "line": c["line"], "url": hit["html_url"]}
+    verdict_of = verify.verdicts(args, findings)
+    valid = [f for f in findings if verdict_of[f["id"]]["valid"]]
+    declined = {f["id"]: verdict_of[f["id"]]["reason"] for f in findings if f not in valid}
     if role == "author":
-        open(f"{args.out}/pr-body.md", "w").write(with_block(pr["body"], block))
-        gh("pr", "edit", str(args.pr), "-R", args.nwo, "--body-file", f"{args.out}/pr-body.md")
-        posted["description_updated"] = True
+        return publish_author(args, pr, findings, valid, verdict_of, declined)
+    files = right_side(gh("pr", "diff", str(args.pr), "-R", args.nwo))
+    spots = {f["id"]: place(f, files) for f in valid}
+    inline = [f for f in valid if f["sev"] in ("P0", "P1", "P2") and spots[f["id"]] and f["id"] not in done]
+    written = written_comments(inline, args.out)
+    for f in inline:
+        written[f["id"]]["suggestion"] = verdict_of[f["id"]]["suggestion"] or written[f["id"]].get("suggestion")
+    comments = [review_comment(f, written[f["id"]], spots[f["id"]]) for f in inline]
+    counts = ", ".join(f"{s}: {n}" for s in ("P0", "P1", "P2") if (n := sum(f["sev"] == s for f in inline)))
+    body = f"Reptile: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
+    review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments, "body": body}
+    if args.dry_run:
+        print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}")
+        return
+    publish(args, review, inline, done)
+
+
+def publish_author(args, pr, findings, valid, verdict_of, declined):
+    if args.dry_run:
+        print("role: author\n\n# would fix\n" + "\n".join(f["line"] for f in valid) +
+              "\n\n# description block\n" + summary_block(findings, {}, declined, passed_rows(args.out)))
+        return
+    fixed, skipped = verify.fix(args, valid, verdict_of, pr["title"])
+    declined.update({i: f"Verified as valid, but not fixed: {why}" for i, why in skipped.items()})
+    block = summary_block(findings, fixed, declined, passed_rows(args.out))
+    open(f"{args.out}/pr-body.md", "w").write(with_block(pr["body"], block))
+    gh("pr", "edit", str(args.pr), "-R", args.nwo, "--body-file", f"{args.out}/pr-body.md")
+    json.dump({"pr": args.pr, "role": "author", "fixed": fixed, "declined": declined}, open(f"{args.out}/posted.json", "w"), indent=1)
+    print(f"Reptile fixed {len(fixed)} findings and pushed; {len(declined)} not changed; notes in the PR description")
+
+
+def publish(args, review, inline, done):
+    posted = {"pr": args.pr, "role": "reviewer", "comments": dict(done)}
+    if not review["comments"]:
+        print("Reptile: no verified P0-P2 finding; nothing posted")
+        return
+    res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
+                        stdin=json.dumps(review)))
+    made = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews/{res['id']}/comments?per_page=100"))
+    posted.update(review_id=res["id"], review_url=res.get("html_url"))
+    for f, c in zip(inline, review["comments"]):
+        hit = next((m for m in made if m["path"] == c["path"] and m["body"].strip() == c["body"].strip()), None)
+        if hit:
+            posted["comments"][f["id"]] = {"id": hit["id"], "path": hit["path"], "line": c["line"], "url": hit["html_url"]}
     json.dump(posted, open(f"{args.out}/posted.json", "w"), indent=1)
-    print(f"Reptile posted {len(posted['comments'])} comments as {role}: {posted.get('review_url', 'description only')}")
+    print(f"Reptile posted {len(posted['comments'])} comments: {posted['review_url']}")

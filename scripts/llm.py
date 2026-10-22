@@ -49,10 +49,11 @@ def ask(prompt, base, model=None, cwd=None, tools=False):
 
 
 def claude_call(prompt, base, model, cwd, tools):
-    """`claude -p` with read-only tools; REPTILE_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
+    """`claude -p` with read-only tools, or edit tools when tools is "write"; REPTILE_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
     args = shlex.split(os.environ.get("REPTILE_CLAUDE_CMD", "claude"))
     args += ["-p", prompt, "--model", model, "--output-format", "json", "--dangerously-skip-permissions"]
-    args += ["--disallowedTools", "Edit", "Write", "NotebookEdit", "Agent", "WebFetch", "WebSearch"] if tools else ["--tools", ""]
+    read_only = [] if tools == "write" else ["Edit", "Write", "NotebookEdit"]
+    args += ["--disallowedTools", *read_only, "Agent", "WebFetch", "WebSearch"] if tools else ["--tools", ""]
     try:
         r = subprocess.run(args, capture_output=True, text=True, cwd=cwd, timeout=CALL_TIMEOUT)
     except subprocess.TimeoutExpired:
@@ -68,9 +69,9 @@ def claude_call(prompt, base, model, cwd, tools):
 
 
 def codex_call(prompt, base, model, cwd, tools):
-    """`codex exec` in a read-only sandbox; the model is REPTILE_CODEX_MODEL or Codex's default. No cost report."""
+    """`codex exec` in a read-only sandbox (workspace-write when tools is "write"); the model is REPTILE_CODEX_MODEL or Codex's default. No cost report."""
     last = base + ".last.txt"
-    args = ["codex", "exec", "--sandbox", "read-only", "--skip-git-repo-check", "--ephemeral", "-C", cwd,
+    args = ["codex", "exec", "--sandbox", "workspace-write" if tools == "write" else "read-only", "--skip-git-repo-check", "--ephemeral", "-C", cwd,
             "--json", "--output-last-message", last]
     if os.environ.get("REPTILE_CODEX_MODEL"):
         args += ["--model", os.environ["REPTILE_CODEX_MODEL"]]

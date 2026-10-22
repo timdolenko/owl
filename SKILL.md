@@ -1,11 +1,11 @@
 ---
 name: reptile
-description: Reptile, a deep Greptile-style code review of a pull request or branch diff. Builds a repository graph and context packs per changed declaration (Swift), adds codebase wiki pages and team rules mined from past PR review threads, runs parallel read-only reviewers (per file, whole PR, clean-code, regressions) through Claude Code or Codex CLI, merges duplicates, and can post the result as one GitHub review and answer each comment after fixing. Use before requesting human or bot review of a PR or branch, when asked for a deep or thorough review, or as the review step of a pipeline. Costs about $5-7 per PR with Claude Opus; takes 5-20 minutes.
+description: Reptile, a deep Greptile-style code review of a pull request or branch diff. Builds a repository graph and context packs per changed declaration (Swift), adds codebase wiki pages and team rules mined from past PR review threads, runs parallel read-only reviewers (per file, whole PR, clean-code, regressions) through Claude Code or Codex CLI, merges duplicates, verifies every finding with its own agent, then fixes and pushes the valid ones on your own PR or posts them with suggestions on someone else's. Use before requesting human or bot review of a PR or branch, when asked for a deep or thorough review, or as the review step of a pipeline. Costs about $5-7 per PR with Claude Opus; takes 5-20 minutes.
 ---
 
 # reptile (Reptile)
 
-Reptile reviews a diff the way Greptile does, then posts the result to the PR. It never changes code itself. You (the agent) fix the findings afterwards.
+Reptile reviews a diff the way Greptile does. Before anything goes to the PR, one verifier agent per finding checks it against the PR's code and decides if it is true and worth changing. On your own PR Reptile then fixes the valid findings itself; on someone else's PR it posts them.
 
 `SKILL_DIR` below is the directory that holds this file. Run every command from inside the repository under review.
 
@@ -39,27 +39,20 @@ A rerun on the same head commit reuses the answers already in the run directory.
 ```
 
 - `--role auto` is `author` when the gh user opened the PR, else `reviewer`.
-- Author: findings with confidence >= 0.5 become inline comments; the rest are one "Low confidence" list in the review summary (in benchmarks most of them were declined), and the PR description gets a Reptile block with the SAFE and unsure items.
-- Reviewer (someone else's PR): only P0-P2 with confidence >= 0.75 inline (`--min-confidence` changes the bar). Nothing else is posted: no description edit, no notes block; the rest stays in the run directory.
-- All comments go out as one review. `<run dir>/posted.json` maps each finding id (`F3`) to its comment id. A second post of the same run is refused unless `--force`.
+- First, one verifier per finding (6 in parallel, on a detached checkout of the PR head) answers VALID or INVALID with a reason. Pre-existing issues, behaviour the ticket decided, unreachable cases, tests of trivial code and taste with no written rule are INVALID. `<run dir>/verdicts.json` keeps every verdict.
+- Author (your own PR): one fixer agent fixes the valid findings in `--repo`, commits each fix (`[TICKET-n] ` prefix from the PR title) and pushes. Nothing is posted as a comment. The PR description gets a folded Reptile block: fixed, checked and not changed (with the reason), unsure. `posted.json` holds `fixed` and `declined`.
+- Reviewer (someone else's PR): only valid P0-P2 findings are posted inline, with the verifier's suggestion when the fix is small. Nothing else is posted.
+- A second post of the same run is refused unless `--force`.
 
-## 3. Fix and reply (when you are the author or the fixer)
+## 3. After the post (author)
 
-For each comment in `posted.json`, in severity order:
+Read `posted.json` and Reptile's commits (`git log`). Build, run the tests for the touched code, and recheck the behaviour near the fixes. Never reply "not changed" on the PR: the reasons are already in the description block. Fix the `NOT CONFIRMED` lines in `passed.md` that are real, and run the manual steps you can run.
 
-1. Verify the finding against the code. Read the cited lines and the scenario. A finding is a claim, not a fact.
-2. If it is real, make the smallest fix that removes it. Never change product behavior, copy, scope or an acceptance criterion to resolve a finding; if only a product decision can fix it, decline and say so.
-3. If it is wrong, already handled, or out of scope, decline it with a one-sentence reason that cites `file:line`.
-4. Commit the fixes, then reply on each comment:
+`reply` stays for comments Reptile posted as reviewer, or for human comments:
 
 ```bash
 "$SKILL_DIR/scripts/reptile.py" reply --pr <number> --comment <id> --status fixed --text "<what changed>" --resolve
-"$SKILL_DIR/scripts/reptile.py" reply --pr <number> --comment <id> --status declined --text "<reason, file:line>"
 ```
-
-`--sha` defaults to `HEAD`. Resolve only the threads you fixed. Then push.
-
-Also look at the findings that were not posted (the unsure list in the Reptile block) and the `NOT CONFIRMED` lines: fix the real ones the same way, and run the manual steps you can run.
 
 ## Setup
 
