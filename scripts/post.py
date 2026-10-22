@@ -1,7 +1,7 @@
 """Verifies each finding (verify.py), then publishes. Author role (your own PR): Reptile fixes the valid findings,
 commits and pushes, and posts no comments; what it fixed, what it checked and did not change, and what it could not
 check go folded into the PR description, for the author and for Greptile. Reviewer role (someone else's PR): only
-verified P0-P2 findings are posted inline, with a suggestion when the fix is small; nothing else.
+verified P0-P2 findings are posted inline, with a suggestion when the fix is small; with none, Reptile approves the PR.
 Writes <out>/posted.json."""
 import json, os, re, subprocess, sys
 from urllib.parse import quote
@@ -163,7 +163,7 @@ def run(args):
     if args.dry_run:
         print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}")
         return
-    publish(args, review, inline, done)
+    publish(args, review, inline, done, meta["head"] == pr["headRefOid"])
 
 
 def publish_author(args, pr, findings, valid, verdict_of, declined):
@@ -180,11 +180,16 @@ def publish_author(args, pr, findings, valid, verdict_of, declined):
     print(f"Reptile fixed {len(fixed)} findings and pushed; {len(declined)} not changed; notes in the PR description")
 
 
-def publish(args, review, inline, done):
+def publish(args, review, inline, done, reviewed_head):
     posted = {"pr": args.pr, "role": "reviewer", "comments": dict(done)}
-    if not review["comments"]:
-        print("Reptile: no verified P0-P2 finding; nothing posted")
+    if not review["comments"] and done:
+        print("Reptile: no new verified P0-P2 finding; nothing posted")
         return
+    if not review["comments"] and not reviewed_head:
+        print("Reptile: no finding, but the PR head moved since the review; not approving. Review the new head.")
+        return
+    if not review["comments"]:
+        review.update(event="APPROVE", body="Reptile reviewed this PR and found no issues.")
     res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
                         stdin=json.dumps(review)))
     made = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews/{res['id']}/comments?per_page=100"))
