@@ -36,7 +36,7 @@ The acceptance criteria and product decisions are not up for review. Never propo
 ## A finding must
 
 - Be introduced by this diff.
-- Have a concrete scenario and a concrete fix.
+- Have a concrete scenario and a concrete fix. Give one fix that fully removes the defect in that scenario; never offer an alternative ("X, or Y") that only partly does, because the fixer takes the cheaper one.
 - Name the other code that is provably affected if it claims the change breaks something elsewhere. "This may break X" is not a finding.
 - Not be an intentional change the ticket or PR describes.
 - Be something the author would fix if they saw it.
