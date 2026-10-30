@@ -9,9 +9,9 @@ Open Claude Code or Codex CLI in the repo and paste:
 ```text
 Set up the Owl PR reviewer (https://github.com/timdolenko/owl) for this repository.
 
-1. If ~/code-skills/owl does not exist, clone it there and run ./install.sh (it installs for both Claude Code and Codex).
+1. If ~/owl does not exist, clone the repo to ~/owl and run ./install.sh (it installs for both Claude Code and Codex).
 2. Add `.owl/*` and `!.owl/notes/` to this repo's .gitignore.
-3. In the background, run `~/code-skills/owl/scripts/owl.py memory --since <the date 6 months ago>`
+3. In the background, run `~/owl/scripts/owl.py memory --since <the date 6 months ago>`
    from the repo root and wait for it to finish.
 4. Write .owl/notes/all.md, .owl/notes/clean-code.md and .owl/notes/regressions.md, 5 to 10 short
    bullets each. Build them from ~/.cache/owl/<owner-repo>/memory/rules.json, the repo's
@@ -21,7 +21,7 @@ Set up the Owl PR reviewer (https://github.com/timdolenko/owl) for this reposito
    - regressions.md: where changes here break things CI does not catch.
    Every bullet must come from a past review thread or a written rule. No generic advice.
 5. Pick the most recently merged PR that had review comments and run
-   `~/code-skills/owl/scripts/owl.py review --pr <n>`. Compare its findings.md with the comments
+   `~/owl/scripts/owl.py review --pr <n>`. Compare its findings.md with the comments
    reviewers actually left, and list what Owl caught, missed, and raised that nobody did.
    Never post anything to GitHub.
 6. Show me the notes and that comparison. Commit only the notes and .gitignore once I approve.
@@ -34,10 +34,10 @@ What makes Owl review like your team is not the model but two inputs: team rules
 **1. Install** (Python 3.10+, `git`, `gh` logged in, `claude` or `codex` on `PATH`):
 
 ```bash
-git clone https://github.com/timdolenko/owl ~/code-skills/owl && ~/code-skills/owl/install.sh --claude
+git clone https://github.com/timdolenko/owl ~/owl && ~/owl/install.sh --claude
 ```
 
-The venv lives at `${OWL_HOME:-~/.cache/owl}/venv`. `--codex` installs for Codex CLI instead; `--copy` copies instead of linking.
+Any clone location works; `~/owl` is only the example used here. The venv lives at `${OWL_HOME:-~/.cache/owl}/venv`. `--codex` installs for Codex CLI instead; `--copy` copies instead of linking.
 
 **2. Keep run output out of the reviewed repo** (Owl also writes `.owl/.gitignore` itself):
 
@@ -49,7 +49,7 @@ The venv lives at `${OWL_HOME:-~/.cache/owl}/venv`. `--codex` installs for Codex
 **3. Gather the team's review history.** From inside the repo:
 
 ```bash
-~/code-skills/owl/scripts/owl.py memory --since 2026-01-01
+~/owl/scripts/owl.py memory --since 2026-01-01
 ```
 
 It fetches every PR review thread (human and bot) since that date with `gh` and turns them into "check" rules (what reviewers flagged) and "accepted" rules (what they let through) in `~/.cache/owl/<owner-repo>/memory/rules.json`. Each review then gets the rules that match its files, only from threads older than the PR. The default window is 180 days. This is the slow step: one model call per batch of threads.
@@ -65,9 +65,9 @@ It fetches every PR review thread (human and bot) since that date with `gh` and 
 **5. Run it.** Commit first; Owl reviews commits only.
 
 ```bash
-~/code-skills/owl/scripts/owl.py review --pr 123                                  # writes .owl/<sha>/findings.md
-~/code-skills/owl/scripts/owl.py post --out .owl/<sha> --pr 123 --dry-run        # preview, no GitHub writes
-~/code-skills/owl/scripts/owl.py post --out .owl/<sha> --pr 123                  # author: fixes and pushes; reviewer: posts
+~/owl/scripts/owl.py review --pr 123                                  # writes .owl/<sha>/findings.md
+~/owl/scripts/owl.py post --out .owl/<sha> --pr 123 --dry-run        # preview, no GitHub writes
+~/owl/scripts/owl.py post --out .owl/<sha> --pr 123                  # author: fixes and pushes; reviewer: posts
 ```
 
 Keep the inputs fresh with a daily `owl.py refresh` (graph, wiki and the last 2 days of review threads).
