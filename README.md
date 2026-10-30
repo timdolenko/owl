@@ -2,22 +2,79 @@
 
 A Greptile-style pull request reviewer packaged as an agent skill for Claude Code and Codex CLI. It reviews a PR or branch diff with several parallel read-only model reviewers, posts the result as one GitHub review by "Owl", and gives the fixing agent a command to answer each comment.
 
-## Install
+## Set up on any repo
+
+What makes Owl review like your team is not the model but two inputs: team rules mined from the repo's past review threads, and short reviewer notes on what matters in this codebase. Setup builds both once.
+
+**1. Install** (Python 3.10+, `git`, `gh` logged in, `claude` or `codex` on `PATH`):
 
 ```bash
-git clone <this repository> owl && cd owl
-./install.sh            # symlinks into ~/.claude/skills and ~/.codex/skills, creates the venv
-./install.sh --claude   # or only one of them; --copy copies instead of linking
+git clone https://github.com/timdolenko/owl ~/code-skills/owl && ~/code-skills/owl/install.sh --claude
 ```
 
-The venv lives at `${OWL_HOME:-~/.cache/owl}/venv`. Requires Python 3.10+, `git`, `gh` (logged in) and `claude` or `codex`.
+The venv lives at `${OWL_HOME:-~/.cache/owl}/venv`. `--codex` installs for Codex CLI instead; `--copy` copies instead of linking.
 
-Add the run output to the reviewed repo's `.gitignore` (Owl also writes `.owl/.gitignore` itself):
+**2. Keep run output out of the reviewed repo** (Owl also writes `.owl/.gitignore` itself):
 
 ```
 .owl/*
 !.owl/notes/
 ```
+
+**3. Gather the team's review history.** From inside the repo:
+
+```bash
+~/code-skills/owl/scripts/owl.py memory --since 2026-01-01
+```
+
+It fetches every PR review thread (human and bot) since that date with `gh` and turns them into "check" rules (what reviewers flagged) and "accepted" rules (what they let through) in `~/.cache/owl/<owner-repo>/memory/rules.json`. Each review then gets the rules that match its files, only from threads older than the PR. The default window is 180 days. This is the slow step: one model call per batch of threads.
+
+**4. Write the reviewer notes.** Short bullets, committed in the repo:
+
+- `.owl/notes/all.md` (every reviewer and verifier): what is never a finding here, for example accepted conventions or what CI and linters already enforce.
+- `.owl/notes/clean-code.md`: the conventions the team enforces in review.
+- `.owl/notes/regressions.md`: where changes break things CI does not catch (build configurations, a second project file, several entry points into one flow, server contracts).
+
+`OWL_NOTES=<dir>` reads them from somewhere else instead.
+
+**5. Run it.** Commit first; Owl reviews commits only.
+
+```bash
+~/code-skills/owl/scripts/owl.py review --pr 123                                  # writes .owl/<sha>/findings.md
+~/code-skills/owl/scripts/owl.py post --out .owl/<sha> --pr 123 --dry-run        # preview, no GitHub writes
+~/code-skills/owl/scripts/owl.py post --out .owl/<sha> --pr 123                  # author: fixes and pushes; reviewer: posts
+```
+
+Keep the inputs fresh with a daily `owl.py refresh` (graph, wiki and the last 2 days of review threads).
+
+### Let Claude Code do the setup
+
+Open Claude Code in the repo and paste:
+
+```text
+Set up the Owl PR reviewer (https://github.com/timdolenko/owl) for this repository.
+
+1. If ~/code-skills/owl does not exist, clone it there and run ./install.sh --claude.
+2. Add `.owl/*` and `!.owl/notes/` to this repo's .gitignore.
+3. In the background, run `~/code-skills/owl/scripts/owl.py memory --since <the date 6 months ago>`
+   from the repo root and wait for it to finish.
+4. Write .owl/notes/all.md, .owl/notes/clean-code.md and .owl/notes/regressions.md, 5 to 10 short
+   bullets each. Build them from ~/.cache/owl/<owner-repo>/memory/rules.json, the repo's
+   CLAUDE.md / AGENTS.md / CONTRIBUTING.md, and its lint and CI configs.
+   - all.md: what is never a finding in this repo.
+   - clean-code.md: conventions reviewers enforce, minus anything a linter already enforces.
+   - regressions.md: where changes here break things CI does not catch.
+   Every bullet must come from a past review thread or a written rule. No generic advice.
+5. Pick the most recently merged PR that had review comments and run
+   `~/code-skills/owl/scripts/owl.py review --pr <n>`. Compare its findings.md with the comments
+   reviewers actually left, and list what Owl caught, missed, and raised that nobody did.
+   Never post anything to GitHub.
+6. Show me the notes and that comparison. Commit only the notes and .gitignore once I approve.
+```
+
+## Results
+
+On unseen PRs of a large Swift app, the default configuration caught about 74-77% of Greptile's comments strictly (about 86% counting near matches), at about $5-7 per PR with Claude Opus and 5-20 minutes per review.
 
 ## Run
 
@@ -55,8 +112,6 @@ Per-repo reviewer notes, if present, go into the prompts: `.owl/notes/all.md` (e
 6. One whole-PR pass for cross-file issues, and the `clean-code` and `regressions` single-mode reviewers in parallel.
 7. A dedupe pass merges findings with the same root cause and drops nothing; `--filter` instead drops and ranks (fewer comments, more misses).
 8. `post` writes Greptile-style comments with a cheap model, maps each to a line on the diff's right side, and posts one review.
-
-On unseen PRs of a large Swift app, this default configuration caught about 74-77% of Greptile's comments strictly (about 86% counting near matches), at about $5-7 per PR.
 
 ## Limits
 
