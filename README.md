@@ -70,6 +70,14 @@ It fetches every PR review thread (human and bot) since that date with `gh` and 
 ~/owl/scripts/owl.py post --out .owl/<sha> --pr 123                  # author: fixes and pushes; reviewer: posts
 ```
 
+With the skill installed, `owl <PR link>` in Claude Code or Codex does the review and the post in one go.
+
+`post` picks the role from who opened the PR (`--role auto`, the default):
+
+- **Your own PR (author):** Owl fixes each verified finding, commits and pushes on the PR branch, and writes what it fixed and what it left, with reasons, into the PR description. It posts no comments. The PR branch must be checked out at the reviewed commit.
+- **Someone else's PR (reviewer):** verified P0-P2 findings are posted inline, with a suggestion when the fix is small. Owl approves when no verified P0-P1 remains and the PR head is still the reviewed commit.
+- `--role author|reviewer` overrides the choice; `--approve-only` is reviewer without comments. Closed and merged PRs are refused.
+
 Keep the inputs fresh with a daily `owl.py refresh` (graph, wiki and the last 2 days of review threads).
 
 ## Results

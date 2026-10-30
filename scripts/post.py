@@ -129,13 +129,30 @@ def role_of(args, pr):
     return "author" if gh("api", "user", "-q", ".login").strip() == pr["author"]["login"] else "reviewer"
 
 
+def require_open(args, pr):
+    if pr["state"] != "OPEN":
+        sys.exit(f"PR #{args.pr} is {pr['state'].lower()}: nothing to post")
+
+
+def require_pr_branch(args, pr, reviewed):
+    """Author fixes are committed on the checked-out branch and pushed, so it must be the PR branch at the reviewed commit."""
+    branch, head = verify.git(args.repo, "branch", "--show-current").strip(), verify.git(args.repo, "rev-parse", "HEAD").strip()
+    if branch != pr["headRefName"] or head != reviewed:
+        sys.exit(f"author role fixes and pushes on the PR branch: check out {pr['headRefName']} at {reviewed[:10]} "
+                 f"in {args.repo} (gh pr checkout {args.pr}), or pass --role reviewer")
+
+
 def run(args):
     prev = json.load(open(f"{args.out}/posted.json")) if os.path.exists(f"{args.out}/posted.json") else None
     if prev and not args.force and not args.dry_run:
         sys.exit(f"{args.out}/posted.json exists: this run was posted already (--force posts the findings not posted yet)")
     done = (prev or {}).get("comments", {})
-    pr = json.loads(gh("pr", "view", str(args.pr), "-R", args.nwo, "--json", "author,headRefOid,body,title"))
+    pr = json.loads(gh("pr", "view", str(args.pr), "-R", args.nwo, "--json", "author,headRefOid,headRefName,state,body,title"))
     role, meta = role_of(args, pr), json.load(open(f"{args.out}/meta.json"))
+    if not args.dry_run:
+        require_open(args, pr)
+    if role == "author" and not args.dry_run:
+        require_pr_branch(args, pr, meta["head"])
     if meta["head"] != pr["headRefOid"]:
         print(f"warning: run reviewed {meta['head'][:10]}, PR head is {pr['headRefOid'][:10]}; lines may be off", file=sys.stderr)
     findings = parse_findings(open(f"{args.out}/findings.md").read())

@@ -9,6 +9,15 @@ Owl reviews a diff the way Greptile does. Before anything goes to the PR, one ve
 
 `SKILL_DIR` below is the directory that holds this file. Run every command from inside the repository under review.
 
+## Invoked with a PR link
+
+For `owl <PR link>`, review and post that PR in one go:
+
+1. Take owner, repo and number from the link. Work in the current repository when its `origin` is that repo; otherwise clone it into a temporary directory and work there.
+2. The role is `author` when `gh api user -q .login` opened the PR, else `reviewer`. Tell the user which one applies before you start: author fixes and pushes on the PR branch, reviewer posts comments and may approve.
+3. For author, run `gh pr checkout <number>` first, with no uncommitted changes in the checkout. `post` refuses to fix on any other branch.
+4. Run `review --pr <number>` in the background (section 1), then `post --out <run dir> --pr <number>` (section 2), and report what was posted, fixed or approved.
+
 ## 1. Review
 
 Commit first. Owl reviews commits, not uncommitted changes.
