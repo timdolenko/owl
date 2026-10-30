@@ -4,7 +4,7 @@ one whole-PR pass + single-mode reviewers -> dedupe (or filter). Writes <out>/fi
 <out>/findings.raw.md (every candidate). run(args) takes the namespace owl.py builds."""
 import json, os, re, subprocess, time
 from concurrent.futures import ThreadPoolExecutor
-import graph, llm, pack, wiki
+import graph, languages, llm, pack, wiki
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROMPTS = os.path.join(ROOT, "prompts")
@@ -132,7 +132,7 @@ def run(args):
     g = graph.load(args.sha)
     wiki_pages = {}
     if not args.no_wiki:
-        areas = sorted({wiki.area_of(f["path"]) for f in files if f["path"].endswith(".swift")})[:6]
+        areas = sorted({wiki.area_of(f["path"]) for f in files if f["path"].endswith(languages.EXTENSIONS)})[:6]
         with ThreadPoolExecutor(4) as ex:
             wiki_pages = dict(zip(areas, ex.map(lambda a: wiki.page(g, a, args.sha), areas)))
         json.dump(wiki_pages, open(f"{args.out}/wiki.json", "w"))

@@ -1,6 +1,6 @@
 ---
 name: owl
-description: Owl, a deep Greptile-style code review of a pull request or branch diff. Builds a repository graph and context packs per changed declaration (Swift), adds codebase wiki pages and team rules mined from past PR review threads, runs parallel read-only reviewers (per file, whole PR, clean-code, regressions) through Claude Code or Codex CLI, merges duplicates, verifies every finding with its own agent, then fixes and pushes the valid ones on your own PR or posts them with suggestions on someone else's. Use before requesting human or bot review of a PR or branch, when asked for a deep or thorough review, or as the review step of a pipeline. Costs about $5-7 per PR with Claude Opus; takes 5-20 minutes.
+description: Owl, a deep Greptile-style code review of a pull request or branch diff. Builds a repository graph and context packs per changed declaration (Swift, Kotlin, Java, TypeScript/JavaScript, Python, Rust), adds codebase wiki pages and team rules mined from past PR review threads, runs parallel read-only reviewers (per file, whole PR, clean-code, regressions) through Claude Code or Codex CLI, merges duplicates, verifies every finding with its own agent, then fixes and pushes the valid ones on your own PR or posts them with suggestions on someone else's. Use before requesting human or bot review of a PR or branch, when asked for a deep or thorough review, or as the review step of a pipeline. Costs about $5-7 per PR with Claude Opus; takes 5-20 minutes.
 ---
 
 # owl (Owl)
@@ -65,4 +65,4 @@ Read `posted.json` and Owl's commits (`git log`). Build, run the tests for the t
 
 ## Setup
 
-`install.sh` (in the repository of this skill) creates the venv with `tree-sitter` and `tree-sitter-swift`. The scripts need `git`, `gh` (logged in) for `--pr`, `post`, `reply` and `memory`, and `claude` or `codex` on `PATH`. Optional, once per repository and then daily: `owl.py memory --since <YYYY-MM-DD>` (team rules from past PR review threads) and `owl.py refresh`.
+`install.sh` (in the repository of this skill) creates the venv with `tree-sitter` and the grammars in `requirements.txt`. The scripts need `git`, `gh` (logged in) for `--pr`, `post`, `reply` and `memory`, and `claude` or `codex` on `PATH`. Optional, once per repository and then daily: `owl.py memory --since <YYYY-MM-DD>` (team rules from past PR review threads) and `owl.py refresh`.

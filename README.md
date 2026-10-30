@@ -132,7 +132,7 @@ Per-repo reviewer notes, if present, go into the prompts: `.owl/notes/all.md` (e
 
 ## How it works
 
-1. A tree-sitter graph of every Swift declaration at the head commit (cached per file blob).
+1. A tree-sitter graph of every declaration at the head commit in Swift, Kotlin, Java, TypeScript/JavaScript, Python and Rust (cached per file blob).
 2. A context pack per changed declaration: base version, callees, usage sites, sibling implementations, other users of the same keys; plus facts (localization keys, non-code files).
 3. A short wiki page per touched area from a cheap model, cached until the area's declarations change.
 4. Team rules ("check" and "accepted") mined from the repo's past PR review threads, if `memory` was run.
@@ -143,7 +143,7 @@ Per-repo reviewer notes, if present, go into the prompts: `.owl/notes/all.md` (e
 
 ## Limits
 
-- The graph and context packs are Swift only. Other languages are still reviewed from the diff, and reviewers can read any file, but they get no packs and no wiki.
+- The graph and context packs cover Swift, Kotlin, Java, TypeScript/JavaScript, Python and Rust. Other languages are still reviewed from the diff, and reviewers can read any file, but they get no packs and no wiki.
 - Reviews commits only; uncommitted changes are not seen.
 - Claude reviewers run with `--dangerously-skip-permissions` and Edit, Write, NotebookEdit, Agent, WebFetch and WebSearch disallowed. Bash stays available for `git` and `rg`, so run it only on code you trust. Codex runs with `--sandbox read-only`.
 - Cost is reported for Claude only (`meta.json` `cost_usd`); it is `null` for Codex.

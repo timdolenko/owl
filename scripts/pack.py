@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Context packs, Greptile-style: for every declaration a PR changes, the code around it that a reviewer needs.
   main(worktree, base, sha, out)     writes <out>/packs/<file-id>.md, facts.md, files.json
-Packs are built for Swift only; other source files are reviewed from the diff without a pack.
+Packs are built for the languages in languages.py; other source files are reviewed from the diff without a pack.
 Per changed symbol: base version, callees, callers / usage sites, other users of the same keys and events,
 sibling implementations (same protocol), same-named functions elsewhere."""
 import json, os, re, subprocess
-import graph
+import graph, languages
 
 SKIP_NAMES = {"body", "init", "id", "view", "value", "count", "name", "title", "type", "data", "state", "error", "result",
               "description", "content", "text", "url", "image", "action", "handle", "update", "run", "start", "stop", "load",
               "reset", "make", "build", "configure", "setup", "isEnabled", "isEmpty", "subscript", "deinit", "?"}
-CODE_EXT = (".swift", ".m", ".h")
+CODE_EXT = languages.EXTENSIONS + (".m", ".h")
 NOT_REVIEWED = re.compile(r"(\.lock|-lock\.json|lock\.yaml|\.resolved|\.pbxproj|\.svg|\.snap|\.min\.js|\.map)$"
                           r"|(^|/)(vendor|node_modules|Pods|Carthage|dist|build|Derived|xcuserdata)/")
 SYMBOL_CAP, FILE_CAP = 5000, 24000
@@ -71,7 +71,7 @@ class Index:
         protos = set()
         for p, d in self.by_name.get(owner, []):
             if d["k"] in ("class", "struct", "enum", "actor", "extension"):
-                protos.update(i.split("<")[0].strip() for i in d.get("i", []))
+                protos.update(graph.parent_name(i) for i in d.get("i", []))
         return protos
 
 
@@ -84,7 +84,7 @@ def base_version(wt, base, path, d):
     src = git(wt, "show", f"{base}:{path}")
     if not src:
         return "(file is new in this PR)"
-    for b in graph.index_source(src.encode()):
+    for b in graph.index_source(src.encode(), path):
         if b["n"] == d["n"] and b.get("t") == d.get("t") and b["k"] == d["k"]:
             body = src.splitlines()[b["s"] - 1:b["e"]]
             return "\n".join(body[:80]) + ("\n… (cut)" if len(body) > 80 else "")
@@ -100,7 +100,7 @@ def usage_sites(wt, ix, path, d, cut):
     hits = graph.callers(wt, ix.g, name, exclude_path=path, exclude_lines=(d["s"], d["e"]))
     if d.get("t") and len(hits) > 40:
         owner_files = {p for p, x in ix.by_name.get(d["t"], [])}
-        mention = set(git(wt, "grep", "-l", "-w", d["t"], "--", "*.swift").split())
+        mention = set(git(wt, "grep", "-l", "-w", d["t"], "--", *graph.CODE_GLOBS).splitlines())
         hits = [h for h in hits if h["path"] in mention or h["path"] in owner_files]
     if len(hits) > 18:
         cut.append(f"{d['n']}: {len(hits) - 18} more usage sites")
@@ -186,7 +186,7 @@ def types_used(wt, sha, ix, d, cut):
 def symbol_pack(wt, base, sha, ix, path, d, cut):
     title = f"{d['t'] + '.' if d.get('t') else ''}{d['n']}"
     parts = [f"### `{title}` ({d['k']}, {path}:{d['s']}-{d['e']})", f"`{d.get('sig', '')}`"]
-    parts += ["", "Base version:", "```swift", base_version(wt, base, path, d), "```"]
+    parts += ["", "Base version:", f"```{os.path.splitext(path)[1][1:]}", base_version(wt, base, path, d), "```"]
     for label, rows in (("Calls (definitions)", callees(ix, d, path, cut)),
                         ("Usage sites (callers and references)", [f"- {h['path']}:{h['line']} in `{h['in']}`: `{h['code']}`"
                                                                   for h in usage_sites(wt, ix, path, d, cut)]),
@@ -206,7 +206,7 @@ def removed_symbols(wt, base, path, old_ranges):
     src = git(wt, "show", f"{base}:{path}")
     if not src:
         return []
-    return overlapping(graph.index_source(src.encode()), old_ranges)
+    return overlapping(graph.index_source(src.encode(), path), old_ranges)
 
 
 def l10n_facts(wt, base, sha, path):
