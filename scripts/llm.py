@@ -48,6 +48,13 @@ def ask(prompt, base, model=None, cwd=None, tools=False):
             raise CallFailed(f"{base}: no answer after {failures} tries")
 
 
+def agent_env(tools):
+    """Read-only agents get a GitHub token that fails, so only owl.py itself can write to a PR."""
+    if tools == "write":
+        return None
+    return {**os.environ, "GH_TOKEN": "owl-read-only-agent", "GITHUB_TOKEN": "owl-read-only-agent"}
+
+
 def claude_call(prompt, base, model, cwd, tools):
     """`claude -p` with read-only tools, or edit tools when tools is "write"; OWL_CLAUDE_CMD replaces the `claude` prefix (a wrapper or proxy)."""
     args = shlex.split(os.environ.get("OWL_CLAUDE_CMD", "claude"))
@@ -55,7 +62,7 @@ def claude_call(prompt, base, model, cwd, tools):
     read_only = [] if tools == "write" else ["Edit", "Write", "NotebookEdit"]
     args += ["--disallowedTools", *read_only, "Agent", "WebFetch", "WebSearch"] if tools else ["--tools", ""]
     try:
-        r = subprocess.run(args, capture_output=True, text=True, cwd=cwd, timeout=CALL_TIMEOUT)
+        r = subprocess.run(args, capture_output=True, text=True, cwd=cwd, timeout=CALL_TIMEOUT, env=agent_env(tools))
     except subprocess.TimeoutExpired:
         return None, 0.0, f"timed out after {CALL_TIMEOUT}s"
     out = r.stdout + "\n" + r.stderr
