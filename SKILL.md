@@ -41,7 +41,7 @@ A rerun on the same head commit reuses the answers already in the run directory.
 - `--role auto` is `author` when the gh user opened the PR, else `reviewer`.
 - First, one verifier per finding (6 in parallel, on a detached checkout of the PR head) answers VALID or INVALID with a reason. Pre-existing issues, behaviour the ticket decided, unreachable cases, tests of trivial code and taste with no written rule are INVALID. `<run dir>/verdicts.json` keeps every verdict.
 - Author (your own PR): one fixer agent fixes the valid findings in `--repo`, commits each fix (`[TICKET-n] ` prefix from the PR title) and pushes. Nothing is posted as a comment. The PR description gets a folded Owl block: fixed, checked and not changed (with the reason), unsure. `posted.json` holds `fixed` and `declined`.
-- Reviewer (someone else's PR): only valid P0-P2 findings are posted inline, with the verifier's suggestion when the fix is small. With no such finding, Owl approves the PR as the gh user, but only when the PR head is still the reviewed commit. Nothing else is posted.
+- Reviewer (someone else's PR): only valid P0-P2 findings are posted inline, with the verifier's suggestion when the fix is small. Owl approves the PR as the gh user unless a verified P0-P1 remains, and only when the PR head is still the reviewed commit. Nothing else is posted. `--approve-only` (the watcher's automatic runs) never posts a comment: it approves under the same rule and leaves the findings in the run directory.
 - A second post of the same run is refused unless `--force`.
 
 ## 3. After the post (author)

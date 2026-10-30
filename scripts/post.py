@@ -1,7 +1,8 @@
 """Verifies each finding (verify.py), then publishes. Author role (your own PR): Owl fixes the valid findings,
 commits and pushes, and posts no comments; what it fixed, what it checked and did not change, and what it could not
 check go folded into the PR description, for the author and for Greptile. Reviewer role (someone else's PR): only
-verified P0-P2 findings are posted inline, with a suggestion when the fix is small; with none, Owl approves the PR.
+verified P0-P2 findings are posted inline, with a suggestion when the fix is small; Owl approves unless a verified
+P0-P1 remains. With --approve-only (the watcher) nothing is posted and the findings stay in the run directory.
 Writes <out>/posted.json."""
 import json, os, re, subprocess, sys
 from urllib.parse import quote
@@ -153,10 +154,26 @@ def run(args):
     counts = ", ".join(f"{s}: {n}" for s in ("P0", "P1", "P2") if (n := sum(f["sev"] == s for f in inline)))
     body = f"Owl: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
     review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments, "body": body}
+    is_blocking = any(f["sev"] in ("P0", "P1") for f in valid)
+    if not is_blocking and meta["head"] == pr["headRefOid"]:
+        review["event"] = "APPROVE"
     if args.dry_run:
         print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}")
         return
-    publish(args, review, inline, done, meta["head"] == pr["headRefOid"])
+    if args.approve_only:
+        return approve_silently(args, review, valid)
+    publish(args, review, inline, done)
+
+
+def approve_silently(args, review, valid):
+    json.dump({"pr": args.pr, "role": "reviewer", "approve_only": True, "cached": [f["id"] for f in valid]},
+              open(f"{args.out}/posted.json", "w"), indent=1)
+    if review["event"] != "APPROVE":
+        print(f"Owl: blocking findings or a moved head; not approving, {len(valid)} findings cached, nothing posted")
+        return
+    gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
+       stdin=json.dumps({"commit_id": review["commit_id"], "event": "APPROVE", "body": ""}))
+    print(f"Owl approved; {len(valid)} non-blocking findings cached in {args.out}, not posted")
 
 
 def publish_author(args, pr, findings, valid, verdict_of, declined):
@@ -173,19 +190,13 @@ def publish_author(args, pr, findings, valid, verdict_of, declined):
     print(f"Owl fixed {len(fixed)} findings and pushed; {len(declined)} not changed; notes in the PR description")
 
 
-def publish(args, review, inline, done, reviewed_head):
+def publish(args, review, inline, done):
     posted = {"pr": args.pr, "role": "reviewer", "comments": dict(done)}
-    if not review["comments"] and done:
-        print("Owl: no new verified P0-P2 finding; nothing posted")
-        return
-    if review["comments"] and args.approve_only:
-        print(f"Owl: {len(review['comments'])} verified findings; approve-only, nothing posted")
-        return
-    if not review["comments"] and not reviewed_head:
-        print("Owl: no finding, but the PR head moved since the review; not approving. Review the new head.")
+    if not review["comments"] and review["event"] != "APPROVE":
+        print("Owl: nothing new to post, and a blocking finding or a moved head keeps it from approving")
         return
     if not review["comments"]:
-        review.update(event="APPROVE", body="")
+        review["body"] = ""
     res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
                         stdin=json.dumps(review)))
     made = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews/{res['id']}/comments?per_page=100"))
@@ -195,5 +206,5 @@ def publish(args, review, inline, done, reviewed_head):
         if hit:
             posted["comments"][f["id"]] = {"id": hit["id"], "path": hit["path"], "line": c["line"], "url": hit["html_url"]}
     json.dump(posted, open(f"{args.out}/posted.json", "w"), indent=1)
-    verb = "approved" if review["event"] == "APPROVE" else f"posted {len(posted['comments'])} comments"
+    verb = f"posted {len(posted['comments'])} comments" + (" and approved" if review["event"] == "APPROVE" else "")
     print(f"Owl {verb}: {posted['review_url']}")
