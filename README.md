@@ -2,7 +2,32 @@
 
 A Greptile-style pull request reviewer packaged as an agent skill for Claude Code and Codex CLI. It reviews a PR or branch diff with several parallel read-only model reviewers, posts the result as one GitHub review by "Owl", and gives the fixing agent a command to answer each comment.
 
-## Set up on any repo
+## Set up on any repo with Claude Code or Codex
+
+Open Claude Code or Codex CLI in the repo and paste:
+
+```text
+Set up the Owl PR reviewer (https://github.com/timdolenko/owl) for this repository.
+
+1. If ~/code-skills/owl does not exist, clone it there and run ./install.sh (it installs for both Claude Code and Codex).
+2. Add `.owl/*` and `!.owl/notes/` to this repo's .gitignore.
+3. In the background, run `~/code-skills/owl/scripts/owl.py memory --since <the date 6 months ago>`
+   from the repo root and wait for it to finish.
+4. Write .owl/notes/all.md, .owl/notes/clean-code.md and .owl/notes/regressions.md, 5 to 10 short
+   bullets each. Build them from ~/.cache/owl/<owner-repo>/memory/rules.json, the repo's
+   CLAUDE.md / AGENTS.md / CONTRIBUTING.md, and its lint and CI configs.
+   - all.md: what is never a finding in this repo.
+   - clean-code.md: conventions reviewers enforce, minus anything a linter already enforces.
+   - regressions.md: where changes here break things CI does not catch.
+   Every bullet must come from a past review thread or a written rule. No generic advice.
+5. Pick the most recently merged PR that had review comments and run
+   `~/code-skills/owl/scripts/owl.py review --pr <n>`. Compare its findings.md with the comments
+   reviewers actually left, and list what Owl caught, missed, and raised that nobody did.
+   Never post anything to GitHub.
+6. Show me the notes and that comparison. Commit only the notes and .gitignore once I approve.
+```
+
+### Manual setup
 
 What makes Owl review like your team is not the model but two inputs: team rules mined from the repo's past review threads, and short reviewer notes on what matters in this codebase. Setup builds both once.
 
@@ -46,31 +71,6 @@ It fetches every PR review thread (human and bot) since that date with `gh` and 
 ```
 
 Keep the inputs fresh with a daily `owl.py refresh` (graph, wiki and the last 2 days of review threads).
-
-### Let Claude Code do the setup
-
-Open Claude Code in the repo and paste:
-
-```text
-Set up the Owl PR reviewer (https://github.com/timdolenko/owl) for this repository.
-
-1. If ~/code-skills/owl does not exist, clone it there and run ./install.sh --claude.
-2. Add `.owl/*` and `!.owl/notes/` to this repo's .gitignore.
-3. In the background, run `~/code-skills/owl/scripts/owl.py memory --since <the date 6 months ago>`
-   from the repo root and wait for it to finish.
-4. Write .owl/notes/all.md, .owl/notes/clean-code.md and .owl/notes/regressions.md, 5 to 10 short
-   bullets each. Build them from ~/.cache/owl/<owner-repo>/memory/rules.json, the repo's
-   CLAUDE.md / AGENTS.md / CONTRIBUTING.md, and its lint and CI configs.
-   - all.md: what is never a finding in this repo.
-   - clean-code.md: conventions reviewers enforce, minus anything a linter already enforces.
-   - regressions.md: where changes here break things CI does not catch.
-   Every bullet must come from a past review thread or a written rule. No generic advice.
-5. Pick the most recently merged PR that had review comments and run
-   `~/code-skills/owl/scripts/owl.py review --pr <n>`. Compare its findings.md with the comments
-   reviewers actually left, and list what Owl caught, missed, and raised that nobody did.
-   Never post anything to GitHub.
-6. Show me the notes and that comparison. Commit only the notes and .gitignore once I approve.
-```
 
 ## Results
 
