@@ -2,6 +2,26 @@
 
 A Greptile-style pull request reviewer packaged as an agent skill for Claude Code and Codex CLI. It reviews a PR or branch diff with several parallel read-only model reviewers, posts the result as one GitHub review by "Owl", and gives the fixing agent a command to answer each comment.
 
+## How to use
+
+In Claude Code or Codex CLI, with the skill installed:
+
+```text
+# your own PR
+owl https://github.com/<owner>/<repo>/pull/123
+```
+
+Result: Owl checks out the PR branch, reviews it, verifies each finding, fixes the valid ones and pushes one commit per fix. It posts no comments; the PR description gets a folded Owl block with what it fixed, what it checked and left (with the reason), and what it could not check.
+
+```text
+# a colleague's PR
+owl https://github.com/<owner>/<repo>/pull/456
+```
+
+Result: Owl reviews and verifies the same way, then posts one review from your GitHub account with the verified P0-P2 findings inline, each with a suggestion when the fix is small. It approves the PR when no verified P0-P1 remains and the head is still the reviewed commit. It never pushes to the colleague's branch.
+
+A review takes 5-20 minutes.
+
 ## Set up on any repo with Claude Code or Codex
 
 Open Claude Code or Codex CLI in the repo and paste:
