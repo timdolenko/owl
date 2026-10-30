@@ -219,6 +219,7 @@ def parser():
     po.add_argument("--dry-run", action="store_true", help="print the review JSON and the description block; no GitHub writes")
     po.add_argument("--no-llm", action="store_true", help="plain comments from the F-lines, no model call")
     po.add_argument("--force", action="store_true", help="post again although posted.json exists")
+    po.add_argument("--approve-only", action="store_true", help="reviewer: approve when nothing is found, never post comments")
     rp = sub.add_parser("reply", parents=[base], help="reply to one posted comment and optionally resolve its thread")
     rp.add_argument("--pr", type=int, required=True)
     rp.add_argument("--comment", type=int, required=True, help="comment id from <run>/posted.json")

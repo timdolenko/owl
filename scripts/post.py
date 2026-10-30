@@ -178,6 +178,9 @@ def publish(args, review, inline, done, reviewed_head):
     if not review["comments"] and done:
         print("Owl: no new verified P0-P2 finding; nothing posted")
         return
+    if review["comments"] and args.approve_only:
+        print(f"Owl: {len(review['comments'])} verified findings; approve-only, nothing posted")
+        return
     if not review["comments"] and not reviewed_head:
         print("Owl: no finding, but the PR head moved since the review; not approving. Review the new head.")
         return
