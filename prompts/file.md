@@ -27,6 +27,7 @@ Only real problems a user, the data, the build or the analytics would feel. In o
 
 - Write the concrete scenario: user action, timing or device state, input, and the wrong result. A race or a stale result needs one plausible interleaving (slow network, a double tap, sign-out mid-flight, a dismissal during an `await`), not proof that it happens often.
 - Do not argue a concern away. If the safety depends on timing, on every caller never doing something, on undocumented SDK behaviour, or on more than two steps of reasoning, report it. If the code is right but looks wrong to a careful reader, report it as P2 with the fix "make it self-evident".
+- In a library, SDK or package, every public entry point counts as a caller, whether or not a host uses it today.
 - A behaviour change against the base is a finding unless the PR description says it is intended.
 - The PR description and code comments are a spec: code that does not do what they say is a finding.
 - Never report style, naming or formatting preferences, and never ask for changes to what the feature does (copy, scope, product decisions).

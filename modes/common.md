@@ -30,6 +30,7 @@ The acceptance criteria and product decisions are not up for review. Never propo
 - A race, a stale result or an ordering problem needs a plausible interleaving (slow network, a double tap, sign-out mid-flight, a remote config refresh, a dismissal during an await), not proof that it happens often.
 - A concern about the code's own behaviour is never `NOT CONFIRMED`: decide whether it is a finding or `SAFE`. When you are unsure, it is a finding, P2 if you cannot verify an external API it depends on.
 - If you had to argue a plausible misreading away to call code safe (it looks wrong, but is right), report it as P2 with the fix "make it self-evident" (a clearer API, a name, a one-line comment). A reader who misreads it will flag it.
+- In a library, SDK or package, every public entry point counts as a caller, whether or not a host uses it today. "No host calls it this way" is never a reason for `SAFE` or `NOT CONFIRMED`.
 - `NOT CONFIRMED` is only for what needs a device, a build or a server to check, with the manual step. `BLOCKED` is what the environment stopped you from checking.
 - A defect that also exists on the base is pre-existing: out of scope unless the diff makes it reachable or worse.
 

@@ -13,6 +13,8 @@ Check:
 
 Use the same bar as the per-file reviewers: a concrete, plausible scenario; never style; never product decisions; respect the team's "accepted" rules.
 
+A concern about the code's own behaviour is a finding or `SAFE`, never `NOT CONFIRMED`; check callers with `rg` yourself. In a library, SDK or package, every public entry point counts as a caller, whether or not a host uses it today.
+
 Output only NEW findings that the per-file list does not already cover, one per line, most severe first:
 
 ```
