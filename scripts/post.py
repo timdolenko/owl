@@ -3,6 +3,7 @@ commits and pushes, and posts no comments; what it fixed, what it checked and di
 check go folded into the PR description, for the author and for Greptile. Reviewer role (someone else's PR): only
 verified P0-P2 findings are posted inline, with a suggestion when the fix is small; Owl approves unless a verified
 P0-P1 remains. With --approve-only (the watcher) nothing is posted and the findings stay in the run directory.
+With --no-approve Owl never approves; when no verified P0-P2 finding remains it posts nothing and prints "Owl passed".
 Writes <out>/posted.json."""
 import json, os, re, subprocess, sys
 from urllib.parse import quote
@@ -168,17 +169,17 @@ def run(args):
     for f in inline:
         written[f["id"]]["suggestion"] = verdict_of[f["id"]]["suggestion"] or written[f["id"]].get("suggestion")
     comments = [review_comment(f, written[f["id"]], spots[f["id"]]) for f in inline]
-    counts = ", ".join(f"{s}: {n}" for s in ("P0", "P1", "P2") if (n := sum(f["sev"] == s for f in inline)))
-    body = f"Owl: {len(comments)} comment{'' if len(comments) == 1 else 's'}" + (f" ({counts})" if counts else "")
-    review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments, "body": body}
+    review = {"commit_id": pr["headRefOid"], "event": "COMMENT", "comments": comments, "body": ""}
     is_blocking = any(f["sev"] in ("P0", "P1") for f in valid)
-    if not is_blocking and meta["head"] == pr["headRefOid"]:
+    if not is_blocking and meta["head"] == pr["headRefOid"] and not args.no_approve:
         review["event"] = "APPROVE"
     if args.dry_run:
         print(f"role: {role}\n\n# review\n{json.dumps(review, indent=1)}")
         return
     if args.approve_only:
         return approve_silently(args, review, valid)
+    if args.no_approve and not any(f["sev"] in ("P0", "P1", "P2") for f in valid):
+        return print(f"Owl passed: {len(valid)} non-blocking findings in {args.out}, nothing posted")
     publish(args, review, inline, done)
 
 
@@ -212,8 +213,6 @@ def publish(args, review, inline, done):
     if not review["comments"] and review["event"] != "APPROVE":
         print("Owl: nothing new to post, and a blocking finding or a moved head keeps it from approving")
         return
-    if not review["comments"]:
-        review["body"] = ""
     res = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews", "--method", "POST", "--input", "-",
                         stdin=json.dumps(review)))
     made = json.loads(gh("api", f"repos/{args.nwo}/pulls/{args.pr}/reviews/{res['id']}/comments?per_page=100"))

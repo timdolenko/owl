@@ -220,6 +220,7 @@ def parser():
     po.add_argument("--no-llm", action="store_true", help="plain comments from the F-lines, no model call")
     po.add_argument("--force", action="store_true", help="post again although posted.json exists")
     po.add_argument("--approve-only", action="store_true", help="reviewer: approve unless a verified P0-P1 remains; never post comments, findings stay in the run directory")
+    po.add_argument("--no-approve", action="store_true", help="reviewer: never approve; post nothing when no verified P0-P2 remains")
     rp = sub.add_parser("reply", parents=[base], help="reply to one posted comment and optionally resolve its thread")
     rp.add_argument("--pr", type=int, required=True)
     rp.add_argument("--comment", type=int, required=True, help="comment id from <run>/posted.json")
