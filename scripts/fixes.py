@@ -24,7 +24,8 @@ def round_text(run):
 
 
 def text(runs):
-    return "\n\n".join(round_text(r) for r in runs if os.path.exists(f"{r}/findings.md"))
+    """Newest round first: readers keep only the start of the file."""
+    return "\n\n".join(round_text(r) for r in reversed(runs) if os.path.exists(f"{r}/findings.md"))
 
 
 def run(args):

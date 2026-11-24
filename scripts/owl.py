@@ -239,7 +239,7 @@ def parser():
     rp.add_argument("--resolve", action="store_true", help="resolve the review thread")
     fx = sub.add_parser("fixes", help="write earlier rounds' fixes, open items and rejections for the next round's --fixes")
     fx.add_argument("--out", required=True, help="file to write")
-    fx.add_argument("runs", nargs="*", help="earlier run directories, oldest first")
+    fx.add_argument("runs", nargs="*", help="earlier run directories, oldest first (written newest first)")
     return p
 
 
