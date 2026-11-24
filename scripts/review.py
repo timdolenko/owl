@@ -86,6 +86,8 @@ def mode_lines(args, diff, packs_dir, mode, passed):
     comments the clone misses; regressions compares against the base versions the packs hold."""
     rules = [open(f"{MODES}/common.md").read(), open(f"{MODES}/{mode}.md").read()]
     rules += [f"\n## Codebase notes\n\n{n}" for n in (notes(args, "all"), notes(args, mode)) if n]
+    if earlier_rounds(args):
+        rules += ["\n## Earlier rounds on this pull request\n", earlier_rounds(args)]
     packs = [open(f"{packs_dir}/{f}").read() for f in sorted(os.listdir(packs_dir))] if os.path.isdir(packs_dir) else []
     prompt = "\n".join(rules + [
         f"\n## This run\n\nMode: {mode}\nBase commit: {args.base}\nThe worktree is at the PR's head commit; read any file you need.\n",
@@ -98,6 +100,30 @@ def mode_lines(args, diff, packs_dir, mode, passed):
         raise llm.CallFailed(f"{mode} answered without findings or NO_FINDINGS: {text[:200]!r}")
     passed.extend(passed_lines(text, mode))
     return [f"F | {l} | {mode}" for l in found]
+
+
+def earlier_rounds(args, cap=30000):
+    """What earlier Owl rounds on this PR fixed, left open and rejected (owl.py fixes), when the caller passes --fixes."""
+    path = getattr(args, "fixes", None)
+    return open(path).read()[:cap] if path and os.path.exists(path) else ""
+
+
+def challenge(args, final, diff):
+    """Re-judges every SAFE, NOT CONFIRMED and out-of-scope line and promotes the ones a strict outside reviewer would post
+    (review-bench i2: recall 80% -> 93%); then one more sweep of the most-missed categories. Returns the added F-lines."""
+    rows = [l for l in open(f"{args.out}/passed.md").read().splitlines() if l.strip()]
+    if not rows:
+        return []
+    numbered = "\n".join(f"P{n} | {r}" for n, r in enumerate(rows, 1))
+    prompt = "\n".join([open(f"{PROMPTS}/challenge.md").read(), f"\nBase commit: {args.base}\n",
+                         "\n## Pull request\n", open(args.context).read()[:12000], *conversation(args),
+                         "\n## Earlier rounds\n", earlier_rounds(args) or "(none)",
+                         "\n## Diff\n```diff", diff[:90000], "```",
+                         "\n## Merged result\n", final, "\n", numbered])
+    text, _ = llm.ask(prompt, f"{args.out}/challenge", model=llm.MODEL, cwd=args.worktree, tools=True)
+    last = max([int(m) for m in re.findall(r"^F(\d+) \|", final, re.M)] or [0])
+    added = [l.strip() for l in text.splitlines() if re.match(r"^F\d+ \| challenge \|", l.strip())]
+    return [re.sub(r"^F\d+", f"F{last + n}", l) for n, l in enumerate(added, 1)]
 
 
 def dedupe(args, raw):
@@ -155,6 +181,8 @@ def run(args):
 
     diff = git(args.worktree, "diff", f"{args.base}..{args.sha}")
     modes = [m for m in args.modes.split(",") if m]
+    if earlier_rounds(args) and "fix-delta" not in modes:
+        modes.append("fix-delta")
     with ThreadPoolExecutor(3 + len(modes)) as ex:
         by_mode = [ex.submit(mode_lines, args, diff, f"{args.out}/packs", m, passed) for m in modes]
         per_file = [l for ls in ex.map(review_unit, enumerate(units)) for l in ls]
@@ -188,6 +216,11 @@ def run(args):
             raise llm.CallFailed(f"filter answered without findings or NO_FINDINGS: {final[:200]}")
         final = "\n".join(kept) or "NO_FINDINGS"
     steps.done("filter" if args.filter else "dedupe")
+    if not getattr(args, "no_challenge", False):
+        added = challenge(args, "" if final.strip() == "NO_FINDINGS" else final, diff)
+        if added:
+            final = "\n".join(l for l in [final, *added] if l.strip() != "NO_FINDINGS")
+        steps.done("challenge")
     open(f"{args.out}/findings.md", "w").write(final + "\n")
     count = sum(1 for l in final.splitlines() if re.match(r"^F\d+ \|", l))
     open(f"{args.out}/count", "w").write(f"{count}\n")

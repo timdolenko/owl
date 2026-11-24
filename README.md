@@ -137,9 +137,10 @@ Per-repo reviewer notes, if present, go into the prompts: `.owl/notes/all.md` (e
 3. A short wiki page per touched area from a cheap model, cached until the area's declarations change.
 4. Team rules ("check" and "accepted") mined from the repo's past PR review threads, if `memory` was run.
 5. One Opus reviewer per file group (at most 8), read-only tools in a detached worktree, 30 turns each.
-6. One whole-PR pass for cross-file issues, and the `clean-code` and `regressions` single-mode reviewers in parallel.
+6. One whole-PR pass for cross-file issues, and the `clean-code`, `regressions` and `greptile` (whole-diff checklist sweep) single-mode reviewers in parallel. With `--fixes <file>` (from `owl.py fixes`), a `fix-delta` reviewer checks every earlier fix commit for completeness, new races and unfixed open items.
 7. A dedupe pass merges findings with the same root cause and drops nothing; `--filter` instead drops and ranks (fewer comments, more misses).
-8. `post` writes Greptile-style comments with a cheap model, maps each to a line on the diff's right side, and posts one review.
+8. A challenge pass re-judges every `SAFE`, `NOT CONFIRMED` and out-of-scope line and promotes the ones an outside reviewer would still post (`--no-challenge` skips it).
+9. `post` writes Greptile-style comments with a cheap model, maps each to a line on the diff's right side, and posts one review.
 
 ## Limits
 

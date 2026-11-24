@@ -7,6 +7,7 @@
   owl.py refresh                                      index the default branch + memory of the last 2 days
   owl.py post --out RUN --pr N [--role auto]          post findings as one GitHub review by Owl
   owl.py reply --pr N --comment ID --status fixed     answer (and resolve) one posted comment
+  owl.py fixes --out FILE RUN...                      earlier rounds' fixes, open items and rejections, for --fixes
 
 Data (graph, wiki, memory): ${OWL_HOME:-~/.cache/owl}/<owner-repo>/.
 Engine: --engine or OWL_ENGINE (claude | codex)."""
@@ -15,7 +16,7 @@ import argparse, datetime, json, os, re, shutil, subprocess, sys
 HOME = os.path.expanduser(os.environ.get("OWL_HOME", "~/.cache/owl"))
 VENV = os.path.join(HOME, "venv")
 MODES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "modes")
-COMMANDS = ("review", "index", "memory", "refresh", "post", "reply")
+COMMANDS = ("review", "index", "memory", "refresh", "post", "reply", "fixes")
 
 
 def reexec_in_venv():
@@ -182,6 +183,11 @@ def cmd_reply(args):
     reply.run(args)
 
 
+def cmd_fixes(args):
+    import fixes
+    fixes.run(args)
+
+
 def days_ago(n):
     return (datetime.date.today() - datetime.timedelta(days=n)).isoformat()
 
@@ -193,16 +199,18 @@ def parser():
     common = argparse.ArgumentParser(add_help=False, parents=[base])
     common.add_argument("--dry-run", action="store_true", help="build everything and write every prompt, call no model")
     p = argparse.ArgumentParser(prog="owl.py", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = p.add_subparsers(dest="cmd", metavar="{review,index,memory,refresh,post,reply}")
+    sub = p.add_subparsers(dest="cmd", metavar="{review,index,memory,refresh,post,reply,fixes}")
     r = sub.add_parser("review", parents=[common], help="review a PR or branch diff (default)")
     r.add_argument("--base", help="base ref (default: merge-base with origin's default branch, or the PR's base)")
     r.add_argument("--head", help="head ref (default: HEAD, or the PR's head commit)")
     r.add_argument("--pr", type=int, help="GitHub PR number: title, body and base come from `gh pr view`")
     r.add_argument("--context", dest="context_file", default=os.environ.get("OWL_CONTEXT"), help="extra context file (ticket, acceptance criteria), added to the PR description")
     r.add_argument("--out", help="run directory (default: <repo>/.owl/<head-sha>)")
-    r.add_argument("--modes", default="clean-code,regressions", help="single-mode reviewers, comma separated ('' for none)")
+    r.add_argument("--modes", default="clean-code,regressions,greptile", help="single-mode reviewers, comma separated ('' for none)")
+    r.add_argument("--fixes", default=os.environ.get("OWL_FIXES"), help="earlier rounds on this PR (owl.py fixes): adds the fix-delta reviewer and feeds the challenge")
     for flag, text in (("--no-wiki", "skip the per-area wiki pages"), ("--no-memory", "skip team rules from past reviews"),
                        ("--no-packs", "skip the graph context packs"), ("--no-dedupe", "keep every raw candidate"),
+                       ("--no-challenge", "skip re-judging the SAFE and NOT CONFIRMED lines"),
                        ("--filter", "drop and rank with a strict filter pass instead of the dedupe (posts fewer, misses more)")):
         r.add_argument(flag, action="store_true", help=text)
     i = sub.add_parser("index", parents=[common], help="build the repo graph (and wiki) for a commit")
@@ -218,6 +226,7 @@ def parser():
                     help="author: fix and push the verified findings, notes in the PR description; reviewer: post verified P0-P2 inline (auto: by gh user)")
     po.add_argument("--dry-run", action="store_true", help="print the review JSON and the description block; no GitHub writes")
     po.add_argument("--no-llm", action="store_true", help="plain comments from the F-lines, no model call")
+    po.add_argument("--fixes", default=os.environ.get("OWL_FIXES"), help="earlier rounds on this PR (owl.py fixes), for the verifier's appeal")
     po.add_argument("--force", action="store_true", help="post again although posted.json exists")
     po.add_argument("--approve-only", action="store_true", help="reviewer: approve unless a verified P0-P1 remains; never post comments, findings stay in the run directory")
     po.add_argument("--no-approve", action="store_true", help="reviewer: never approve; post nothing when no verified P0-P2 remains")
@@ -228,6 +237,9 @@ def parser():
     rp.add_argument("--text", required=True, help="what changed, or why not")
     rp.add_argument("--sha", help="commit of the fix (default: HEAD)")
     rp.add_argument("--resolve", action="store_true", help="resolve the review thread")
+    fx = sub.add_parser("fixes", help="write earlier rounds' fixes, open items and rejections for the next round's --fixes")
+    fx.add_argument("--out", required=True, help="file to write")
+    fx.add_argument("runs", nargs="*", help="earlier run directories, oldest first")
     return p
 
 
@@ -236,7 +248,7 @@ def main(argv):
         argv = ["review", *argv]
     args = parser().parse_args(argv)
     {"review": cmd_review, "index": cmd_index, "memory": cmd_memory, "refresh": cmd_refresh, "post": cmd_post,
-     "reply": cmd_reply}[args.cmd](args)
+     "reply": cmd_reply, "fixes": cmd_fixes}[args.cmd](args)
 
 
 if __name__ == "__main__":

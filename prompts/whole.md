@@ -8,7 +8,7 @@ Check:
 - Mismatches between two places the diff touches: detection vs action, the view vs the model, the event vs what was rendered, two copies of the same rule or constant, a protocol and its conformers, the app and its extensions or other targets.
 - Every caller and entry point of what changed: did all of them get the new parameter, callback or behaviour? Defaults of `nil` or `false` hide missed callers.
 - What the PR removed or replaced: is the old behaviour still needed somewhere?
-- The facts: new or changed strings without all locales, files added outside a target, leftovers (debug overrides, QA slugs, `return true` bypasses, unused new code).
+- The facts: new or changed strings that break the repository's localization policy (`AGENTS.md` / `CLAUDE.md`; source-language-only keys are fine where it says so), files added outside a target, leftovers (debug overrides, QA slugs, `return true` bypasses, unused new code).
 - Tests the change obviously needs and does not have, and tests that change shared state (delegates, singletons, user defaults) without restoring it.
 
 Use the same bar as the per-file reviewers: a concrete, plausible scenario; never style; never product decisions; respect the team's "accepted" rules.

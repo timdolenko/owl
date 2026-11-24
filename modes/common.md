@@ -64,7 +64,7 @@ The existing PR conversation (when given) is what other reviewers and the author
 - Mismatches between two places the diff touches: the PR description or a code comment vs the code, detection vs action, the view vs the model, the event vs what was rendered, two copies of the same constant or lockfile.
 - Every other caller, host and entry point of what the diff changes (`rg` for it): did they all get the new parameter, callback or behaviour? Defaults of `nil` or `false` hide missed callers.
 - What the replaced or removed code did that the new code no longer does.
-- New user-facing strings without translations; new controls without an accessibility label; decorative images and overlays not hidden.
+- New user-facing strings that break the repository's localization policy (`AGENTS.md` / `CLAUDE.md`: some repositories add only the source language and translate after merge; that is never a finding there); new controls without an accessibility label; decorative images and overlays not hidden.
 - Leftovers: debug overrides, QA slugs, `return true` bypasses, unused new code.
 
 ## Severity

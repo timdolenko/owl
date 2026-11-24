@@ -35,18 +35,48 @@ def git(repo, *a):
     return subprocess.run(["git", "-C", repo, *a], capture_output=True, text=True).stdout
 
 
+BLOCKING = ("P0", "P1", "P2")
+
+
 def verdict(args, f, head):
     text, _ = llm.ask(verify_prompt(args, f), f"{args.out}/verify/{f['id']}", cwd=head, tools=True)
-    field = lambda name: (m.group(1).strip() if (m := re.search(rf"^{name}:\s*(.+)$", text, re.M)) else "")
+    first = parsed(text)
+    if first["valid"] or f.get("sev") not in BLOCKING:
+        return first
+    return appeal(args, f, head, first)
+
+
+def appeal(args, f, head, first):
+    """A second, independent verifier for every rejected P0-P2 finding: most real defects were lost to a wrong INVALID."""
+    prompt = "\n".join([open(f"{ROOT}/prompts/appeal.md").read(), verify_prompt(args, f, header=False),
+                         "\n## First verifier's answer\n", f"REASON: {first['reason']}",
+                         "\n## Earlier rounds\n", history(args) or "(none)"])
+    text, _ = llm.ask(prompt, f"{args.out}/verify/{f['id']}-appeal", cwd=head, tools=True)
+    second = parsed(text)
+    if second["valid"]:
+        second["reason"] = f"Upheld on appeal: {second['reason']}"
+    elif re.search(r"^REPEAT:\s*yes", text, re.M | re.I):
+        second["reason"] = f"Contested, rejected again after an earlier round rejected it: {second['reason']}"
+    return second
+
+
+def parsed(text):
+    field = lambda name: (m.group(1).strip() if (m := re.search(rf"^{name}:[ \t]*(.+)$", text, re.M)) else "")
     suggestion = re.search(r"```suggestion\n(.*?)```", text, re.S)
     return {"valid": field("VERDICT").upper().startswith("VALID"), "reason": field("REASON"), "fix": field("FIX"),
             "suggestion": suggestion.group(1) if suggestion else ""}
 
 
-def verify_prompt(args, f):
+def history(args):
+    """What earlier rounds on this PR fixed, left open and rejected (owl.py fixes), when the caller passes it."""
+    path = getattr(args, "fixes", None)
+    return open(path).read()[:20000] if path and os.path.exists(path) else ""
+
+
+def verify_prompt(args, f, header=True):
     meta = json.load(open(f"{args.out}/meta.json"))
     conversation = f"{args.out}/conversation.md"
-    return "\n".join([open(f"{ROOT}/prompts/verify.md").read(), f"\nBase commit: {meta['base']}\nHead commit: {meta['head']}\n",
+    return "\n".join([open(f"{ROOT}/prompts/verify.md").read() if header else "", f"\nBase commit: {meta['base']}\nHead commit: {meta['head']}\n",
                       "## The finding\n", f["line"], "\n## Pull request\n", open(f"{args.out}/context.md").read()[:20000],
                       "\n## PR conversation\n", open(conversation).read()[:20000] if os.path.exists(conversation) else "(none)",
                       "\n## Codebase notes\n", notes(args, "all") or "(none)"])

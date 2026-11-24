@@ -18,7 +18,7 @@ Only real problems a user, the data, the build or the analytics would feel. In o
 11. Layout, Dynamic Type, right-to-left and accessibility: fixed sizes that clip, leading/trailing with fixed offsets, missing VoiceOver labels, gesture-only controls.
 12. Feature flags and remote config read once and never observed, exposure logged before assignment, QA or debug overrides left on.
 13. Build: missing imports, files outside the target, private API.
-14. Localization: new or changed user-facing strings without translations (see the facts).
+14. Localization: new or changed user-facing strings that break the repository's localization policy in `AGENTS.md` / `CLAUDE.md` (where new keys ship with the source language only and a job translates them after merge, missing translations are not a finding), hard-coded strings, a translated key replaced by a new one.
 15. Units and encodings: UTF-16 vs `Character`, days vs seconds, `Int` truncation, raw-value case.
 16. Enums and switches: a switch or `==` check that treats every other case of an enum (shown in the pack) as one bucket, so a valid case gets the wrong behaviour.
 17. A missing focused test for ordering-sensitive or contract-like logic the PR adds.

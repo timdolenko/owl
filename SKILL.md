@@ -28,7 +28,7 @@ Commit first. Owl reviews commits, not uncommitted changes.
 "$SKILL_DIR/scripts/owl.py" review --base origin/develop --head HEAD
 ```
 
-Useful options: `--engine codex` (or `OWL_ENGINE=codex`), `--out <dir>`, `--modes clean-code,regressions` (the default), `--no-wiki`, `--no-memory`, `--dry-run` (writes every prompt and calls no model). Run it in the background or with a long timeout: it takes 5-20 minutes. The last lines it prints are `FINDINGS=<n>` and the path of `findings.md`.
+Useful options: `--engine codex` (or `OWL_ENGINE=codex`), `--out <dir>`, `--modes clean-code,regressions,greptile` (the default), `--fixes <file>` (earlier rounds from `owl.py fixes --out <file> <run dir>...`: adds the `fix-delta` reviewer), `--no-challenge`, `--no-wiki`, `--no-memory`, `--dry-run` (writes every prompt and calls no model). Run it in the background or with a long timeout: it takes 5-20 minutes. The last lines it prints are `FINDINGS=<n>` and the path of `findings.md`.
 
 The run directory (default `<repo>/.owl/<head-sha>/`) holds:
 
@@ -48,7 +48,7 @@ A rerun on the same head commit reuses the answers already in the run directory.
 ```
 
 - `--role auto` is `author` when the gh user opened the PR, else `reviewer`.
-- First, one verifier per finding (6 in parallel, on a detached checkout of the PR head) answers VALID or INVALID with a reason. Pre-existing issues, behaviour the ticket decided, unreachable cases, tests of trivial code and taste with no written rule are INVALID. `<run dir>/verdicts.json` keeps every verdict.
+- First, one verifier per finding (6 in parallel, on a detached checkout of the PR head) answers VALID or INVALID with a reason. Pre-existing issues, behaviour the ticket decided, unreachable cases, tests of trivial code and taste with no written rule are INVALID. Every P0-P2 finding marked INVALID goes to a second, independent verifier (`prompts/appeal.md`) with the earlier rounds' rejections; its answer is final, and a concern rejected again after an earlier round is marked "Contested". `<run dir>/verdicts.json` keeps every verdict.
 - Author (your own PR): one fixer agent fixes the valid findings in `--repo`, commits each fix (`[TICKET-n] ` prefix from the PR title) and pushes. Nothing is posted as a comment. The PR description gets a folded Owl block: fixed, checked and not changed (with the reason), unsure. `posted.json` holds `fixed` and `declined`.
 - Reviewer (someone else's PR): only valid P0-P2 findings are posted inline, with the verifier's suggestion when the fix is small. Owl approves the PR as the gh user unless a verified P0-P1 remains, and only when the PR head is still the reviewed commit. Nothing else is posted. `--approve-only` (the watcher's automatic runs) never posts a comment: it approves under the same rule and leaves the findings in the run directory.
 - A second post of the same run is refused unless `--force`.
